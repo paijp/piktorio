@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Piktorio</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #0e0e0e;
+    --green:   #3a7a25;
+    --greenlt: #b8e888;
+    --text:    #d8d4c0;
+    --muted:   #666;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100dvh;
+    gap: 4px;
+    padding: 6px 4px;
+  }
+  #title {
+    font-size: clamp(0.85rem, 3vw, 1.2rem);
+    letter-spacing: 0.25em;
+    color: var(--greenlt);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  #statusbar {
+    display: flex;
+    gap: 12px;
+    font-size: clamp(0.62rem, 2.2vw, 0.78rem);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .stat { display: flex; gap: 3px; }
+  .stat-label { color: var(--muted); }
+  .stat-val   { font-weight: bold; min-width: 2ch; }
+  #piktorioMessage {
+    font-size: clamp(0.58rem, 1.9vw, 0.73rem);
+    color: #aad888;
+    min-height: 1.1em;
+    text-align: center;
+    flex-shrink: 0;
+    padding: 0 8px;
+  }
+  #canvasWrap {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    width: 100%;
+  }
+  #piktorioCanvas {
+    border: 1.5px solid var(--green);
+    cursor: pointer;
+    image-rendering: pixelated;
+    touch-action: none;
+  }
+  #controls {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 520px;
+    gap: 8px;
+    padding: 0 4px;
+  }
+  #dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px;
+    width:  clamp(108px, 28vw, 148px);
+    height: clamp(108px, 28vw, 148px);
+    flex-shrink: 0;
+  }
+  .dpad-btn {
+    background: #1a2a10;
+    border: 1px solid var(--green);
+    color: var(--greenlt);
+    font-size: clamp(1rem, 3.5vw, 1.4rem);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.08s;
+    touch-action: none;
+  }
+  .dpad-btn:active { background: #2d5018; }
+  #actionbtns {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    align-items: stretch;
+    max-width: 200px;
+  }
+  .act-btn {
+    background: #101a08;
+    color: var(--greenlt);
+    border: 1px solid var(--green);
+    padding: 8px 6px;
+    font-family: inherit;
+    font-size: clamp(0.62rem, 1.9vw, 0.76rem);
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    border-radius: 2px;
+    transition: background 0.1s;
+    touch-action: manipulation;
+  }
+  .act-btn:active:not(:disabled) { background: #1e3a10; }
+  .act-btn:disabled { opacity: 0.3; cursor: default; }
+  #legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 10px;
+    font-size: clamp(0.52rem, 1.6vw, 0.66rem);
+    color: #666;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+  .leg { display: flex; align-items: center; gap: 3px; }
+  .leg-box { width: 9px; height: 9px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="title">Piktorio</div>
+  <div id="statusbar">
+    <div class="stat"><span class="stat-label">ターン</span><span class="stat-val" id="piktorioTurn">1</span></div>
+    <div class="stat"><span class="stat-label">フェーズ</span><span class="stat-val" id="piktorioPhase">—</span></div>
+    <div class="stat"><span class="stat-label">残移動</span><span class="stat-val" id="piktorioMoves">3</span></div>
+  </div>
+  <div id="piktorioMessage">読み込み中…</div>
+  <div id="canvasWrap">
+    <canvas id="piktorioCanvas"></canvas>
+  </div>
+  <div id="controls">
+    <div id="dpad">
+      <div></div>
+      <button class="dpad-btn" id="dUp">&#9650;</button>
+      <div></div>
+      <button class="dpad-btn" id="dLeft">&#9664;</button>
+      <div></div>
+      <button class="dpad-btn" id="dRight">&#9654;</button>
+      <div></div>
+      <button class="dpad-btn" id="dDown">&#9660;</button>
+      <div></div>
+    </div>
+    <div id="actionbtns">
+      <button class="act-btn" id="piktorioSkipMove">移動スキップ [Space]</button>
+      <button class="act-btn" id="piktorioEndTurn" disabled>ターン終了 [Enter]</button>
+    </div>
+  </div>
+  <div id="legend">
+    <div class="leg"><div class="leg-box" style="background:#2d5a1b;border-color:#3a7a25"></div>通路</div>
+    <div class="leg"><div class="leg-box" style="background:#1a0d05"></div>壁</div>
+    <div class="leg"><div class="leg-box" style="background:#6b1a1a;border-color:#cc3333"></div>赤専用（置くのみ）</div>
+    <div class="leg"><div class="leg-box" style="background:#1a4a6b;border-color:#3399cc"></div>青専用（置くのみ）</div>
+    <div class="leg"><div class="leg-box" style="background:#5a5a10;border-color:#cccc22"></div>黄専用（置くのみ）</div>
+    <div class="leg"><span style="color:#ff6666">■</span>左上=赤置</div>
+    <div class="leg"><span style="color:#ffee44">■</span>右上=黄置</div>
+    <div class="leg"><span style="color:#55aaff">■</span>左下=青置</div>
+    <div class="leg">右下=全拾</div>
+  </div>
+</div>
+<script src="piktorioengine.js"></script>
+<script>
+const W  = { type: 'walk' };
+const WL = (r, b, y) => ({ type: 'walk', piks: { red: r||0, blue: b||0, yellow: y||0 } });
+const BK = { type: 'wall' };
+const R  = { type: 'red'    };
+const B  = { type: 'blue'   };
+const Y  = { type: 'yellow' };
+
+const mapData = {
+  playerStart: [10, 10],
+  tiles: [
+    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
+    [ BK,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W, BK ],
+    [ BK,  W, BK,  W, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK, BK,  W, BK, BK,  W, BK ],
+    [ BK,  W, BK,  W,  W,  W, BK, WL(3,0,0), BK, W, BK, W,  W,  W,  W,  W, BK,  W,  W, BK ],
+    [ BK,  W, BK, BK, BK,  R,  R,  R, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK,  W, BK ],
+    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
+    [ BK, BK, BK,  W, BK, BK, BK, BK, BK,  W, BK,  B,  B, BK, BK, BK, BK, BK, BK, BK ],
+    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
+    [ BK,  W, BK, BK,  W, BK, BK,  Y,  Y,  W, BK, BK, BK,  W, BK, BK, BK, BK,  W, BK ],
+    [ BK,  W,  W, BK,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
+    [ BK,  W, BK, BK,  W,  W,  W,  W, WL(0,2,0), W, W, W, BK, BK,  W,  W,  W, BK, W, BK ],
+    [ BK,  W,  W,  W,  W, BK, BK,  W,  W,  W, BK,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
+    [ BK, BK, BK,  W, BK, BK,  W,  W,  W, BK,  W,  W, BK, BK,  W,  W, BK, BK,  W, BK ],
+    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
+    [ BK,  W, BK, BK, BK,  R,  R, BK,  W, BK,  Y,  Y, BK,  W, BK, BK, BK, BK,  W, BK ],
+    [ BK,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W, BK ],
+    [ BK, BK,  W, BK, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK, BK ],
+    [ BK,  W,  W,  W,  W, WL(0,0,2), W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
+    [ BK,  W, BK,  W, BK,  W, BK,  B,  B,  W, BK,  W, BK,  W, BK,  W, BK,  W, BK, BK ],
+    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
+  ],
+};
+
+function resizeCanvas() {
+  const canvas = document.getElementById('piktorioCanvas');
+  const wrap   = document.getElementById('canvasWrap');
+  const size   = Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight) / 20) * 20;
+  if (size <= 0) return;
+  canvas.width  = size;
+  canvas.height = size;
+  if (window._piktorioReady) Piktorioengine.init(mapData);
+}
+
+function bindDpad() {
+  const map = { dUp:[-1,0], dDown:[1,0], dLeft:[0,-1], dRight:[0,1] };
+  for (const [id, dir] of Object.entries(map)) {
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', e => { e.preventDefault(); Piktorioengine.movePlayer(...dir); }, { passive: false });
+    btn.addEventListener('click', () => Piktorioengine.movePlayer(...dir));
+  }
+}
+
+function bindActionBtns() {
+  const skip = document.getElementById('piktorioSkipMove');
+  const end  = document.getElementById('piktorioEndTurn');
+  skip.addEventListener('touchstart', e => { e.preventDefault(); Piktorioengine.skipMove(); }, { passive: false });
+  end.addEventListener ('touchstart', e => { e.preventDefault(); Piktorioengine.endPlayerTurn(); }, { passive: false });
+  skip.addEventListener('click', () => Piktorioengine.skipMove());
+  end.addEventListener ('click', () => Piktorioengine.endPlayerTurn());
+}
+
+function bindCanvas() {
+  const canvas = document.getElementById('piktorioCanvas');
+  let ts = null;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    ts = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (!ts) return;
+    const dx = e.changedTouches[0].clientX - ts.x;
+    const dy = e.changedTouches[0].clientY - ts.y;
+    const dist = Math.abs(dx) + Math.abs(dy);
+    ts = null;
+    if (dist < 18) {
+      Piktorioengine.handleCanvasClick(e.changedTouches[0]);
+    } else {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        Piktorioengine.movePlayer(0, dx > 0 ? 1 : -1);
+      } else {
+        Piktorioengine.movePlayer(dy > 0 ? 1 : -1, 0);
+      }
+    }
+  }, { passive: false });
+  canvas.addEventListener('click', e => Piktorioengine.handleCanvasClick(e));
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  resizeCanvas();
+  bindDpad();
+  bindActionBtns();
+  bindCanvas();
+  window._piktorioReady = true;
+  Piktorioengine.init(mapData);
+});
+
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(resizeCanvas, 150);
+});
+</script>
+</body>
+</html>
