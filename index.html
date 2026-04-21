@@ -36,9 +36,9 @@
     <div class="leg"><div class="leg-box" style="background:#2d5a1b"></div>通路</div>
     <div class="leg"><div class="leg-box" style="background:#5a3010"></div>壁</div>
     <div class="leg"><div class="leg-box" style="background:#4a2808"></div>ヒビ壁</div>
-    <div class="leg"><div class="leg-box" style="background:#7a1a1a"></div>赤ヒビ→連鎖</div>
-    <div class="leg"><div class="leg-box" style="background:#113d77"></div>青ヒビ→連鎖</div>
-    <div class="leg"><div class="leg-box" style="background:#5a5a08"></div>黄ヒビ→連鎖</div>
+    <div class="leg"><div class="leg-box" style="background:#cc3333"></div>赤/赤ヒビ</div>
+    <div class="leg"><div class="leg-box" style="background:#2277cc"></div>青/青ヒビ</div>
+    <div class="leg"><div class="leg-box" style="background:#aaaa10"></div>黄/黄ヒビ</div>
   </div>
 </div>
 <script src="piktorioengine.js"></script>
@@ -88,20 +88,23 @@ function resizeCanvas(){
   canvas.width=size;canvas.height=size;
   if(window._piktorioReady)Piktorioengine.init(mapData);
 }
+
 function bindCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
-  let ts=null;
-  canvas.addEventListener('touchstart',e=>{e.preventDefault();ts={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:false});
+  // タップのみ（スワイプ廃止）
+  canvas.addEventListener('touchstart',e=>{e.preventDefault();},{passive:false});
   canvas.addEventListener('touchend',e=>{
-    e.preventDefault();if(!ts)return;
-    const dx=e.changedTouches[0].clientX-ts.x,dy=e.changedTouches[0].clientY-ts.y;
-    const dist=Math.abs(dx)+Math.abs(dy);ts=null;
-    if(dist<16)Piktorioengine.handleCanvasClick(e.changedTouches[0]);
-    else{if(Math.abs(dx)>Math.abs(dy))Piktorioengine.movePlayer(0,dx>0?1:-1);else Piktorioengine.movePlayer(dy>0?1:-1,0);}
+    e.preventDefault();
+    Piktorioengine.handleCanvasClick(e.changedTouches[0]);
   },{passive:false});
   canvas.addEventListener('click',e=>Piktorioengine.handleCanvasClick(e));
 }
-window.addEventListener('DOMContentLoaded',()=>{resizeCanvas();bindCanvas();window._piktorioReady=true;Piktorioengine.init(mapData);});
+
+window.addEventListener('DOMContentLoaded',()=>{
+  resizeCanvas();bindCanvas();
+  window._piktorioReady=true;
+  Piktorioengine.init(mapData);
+});
 let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(resizeCanvas,150);});
 </script>
 </body>

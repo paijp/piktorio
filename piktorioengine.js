@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.8
+// piktorioengine.js — Piktorioゲームエンジン v0.9
 
 const Piktorioengine = (() => {
 
@@ -7,12 +7,9 @@ const Piktorioengine = (() => {
   const MAP_SCALE  = 2;
   const CRACKED_HP = 100;
 
-  // ヒビ壁の対応する基本タイル
   const CRACKED_BASE = { cracked:'walk', red_cracked:'red', blue_cracked:'blue', yellow_cracked:'yellow' };
   const IS_CRACKED   = t => t in CRACKED_BASE;
   const BASE_OF      = t => CRACKED_BASE[t] || t;
-
-  // 壊れた後になるタイル（色タイルヒビ→色タイル、cracked→walk）
   const BREAK_INTO   = { cracked:'walk', red_cracked:'red', blue_cracked:'blue', yellow_cracked:'yellow' };
 
   const TILE_FILL = {
@@ -22,9 +19,9 @@ const Piktorioengine = (() => {
     red:           '#cc3333',
     blue:          '#2277cc',
     yellow:        '#aaaa10',
-    red_cracked:   '#7a1a1a',  // 赤タイルより暗め
-    blue_cracked:  '#113d77',
-    yellow_cracked:'#5a5a08',
+    red_cracked:   '#cc3333',  // 赤タイルと同色
+    blue_cracked:  '#2277cc',  // 青タイルと同色
+    yellow_cracked:'#aaaa10',  // 黄タイルと同色
   };
   const MINI_FILL = {
     walk:          '#3a7a22',
@@ -33,27 +30,34 @@ const Piktorioengine = (() => {
     red:           '#cc4444',
     blue:          '#3388cc',
     yellow:        '#aaaa20',
-    red_cracked:   '#882222',
-    blue_cracked:  '#1a4488',
-    yellow_cracked:'#666610',
+    red_cracked:   '#cc4444',
+    blue_cracked:  '#3388cc',
+    yellow_cracked:'#aaaa20',
   };
-  // タイルごとの円グラフ枠線色（やや明るめ）
   const GAUGE_STROKE = {
-    cracked:       'rgba(200,160,100,0.8)',
-    red_cracked:   'rgba(220,100,100,0.8)',
-    blue_cracked:  'rgba(80,160,240,0.8)',
-    yellow_cracked:'rgba(200,200,60,0.8)',
+    cracked:       'rgba(220,220,220,0.85)',
+    red_cracked:   'rgba(255,160,160,0.9)',
+    blue_cracked:  'rgba(120,200,255,0.9)',
+    yellow_cracked:'rgba(240,240,80,0.9)',
   };
 
   let state = null;
   const _flash = {};
+
   function _flashKey(r,c,zone){ return `${r},${c},${zone}`; }
+
   function _triggerFlash(r,c,zone){
-    _flash[_flashKey(r,c,zone)]=Date.now()+180;
-    setTimeout(()=>{if(state)_render();},200);
+    const key = _flashKey(r,c,zone);
+    _flash[key] = Date.now() + 160;
+    // フラッシュ開始：即再描画
+    if(state) _render();
+    // フラッシュ終了後：再描画してフラッシュを消す
+    setTimeout(()=>{ if(state) _render(); }, 180);
   }
+
   function _isFlashing(r,c,zone){
-    const t=_flash[_flashKey(r,c,zone)]; return t&&Date.now()<t;
+    const t = _flash[_flashKey(r,c,zone)];
+    return t != null && Date.now() < t;
   }
 
   // ===== 初期化 =====
@@ -119,12 +123,7 @@ const Piktorioengine = (() => {
     if(!_isReachableForAction(r,c)){_setMessage('操作できるのは隣接マス（斜め含む）のみです');_render();return;}
     const cell=state.map[r][c],type=cell.type;
     if(type==='wall'){_setMessage('壁には操作できません');_render();return;}
-
     if(zone==='bottomright'){
-      // 回収：walkおよび色タイル（ヒビ含む）でpikがある場合
-      // ただしプレイヤー自身のいるwalkマスのみ直接回収可
-      // → 色タイルはプレイヤーが入れないがpikは置ける→隣接から回収可
-      if(type==='wall'){_setMessage('壁からは回収できません');_render();return;}
       if(!COLORS.some(col=>cell.piks[col]>0)){_setMessage('このマスにpikはいません');_render();return;}
       _triggerFlash(r,c,zone);
       COLORS.forEach(col=>{state.player.piks[col]+=cell.piks[col];cell.piks[col]=0;});
@@ -132,7 +131,6 @@ const Piktorioengine = (() => {
     }else{
       const colorMap={topleft:'red',topright:'yellow',bottomleft:'blue'};
       const color=colorMap[zone];
-      // 色専用マスへの色制限（ヒビ含む）
       const base=BASE_OF(type);
       if(base==='red'    &&color!=='red')   {_setMessage('赤マスには赤pikのみ置けます');  _render();return;}
       if(base==='blue'   &&color!=='blue')  {_setMessage('青マスには青pikのみ置けます');  _render();return;}
@@ -146,14 +144,12 @@ const Piktorioengine = (() => {
   }
   function _colorJa(c){return{red:'赤',blue:'青',yellow:'黄'}[c]||c;}
 
-  // ===== ターン制御 =====
   function endPlayerTurn(){
     if(state.phase!=='player_action')return;
     state.phase='pik';_setMessage('pikターン中…');_render();setTimeout(_runPikTurn,400);
   }
   function skipMove(){if(state.phase!=='player_move')return;_enterActionPhase();}
 
-  // ===== pikターン：ヒビ壁ダメージ＋連鎖破壊 =====
   function _runPikTurn(){
     const broken=[];
     for(let r=0;r<state.rows;r++)for(let c=0;c<state.cols;c++){
@@ -162,27 +158,20 @@ const Piktorioengine = (() => {
       const dmg=cell.piks.red*2+cell.piks.blue+cell.piks.yellow;
       if(dmg<=0)continue;
       cell.hp=Math.max(0,cell.hp-dmg);
-      if(cell.hp===0) broken.push([r,c]);
+      if(cell.hp===0)broken.push([r,c]);
     }
-    // 連鎖破壊
-    for(const [r,c] of broken) _breakAndChain(r,c);
-
+    for(const[r,c]of broken)_breakAndChain(r,c);
     state.phase='enemy';_setMessage('敵ターン中…');_render();setTimeout(_runEnemyTurn,400);
   }
 
-  // ヒビ壁を壊し、同色非ヒビタイルを連鎖的に通路化
   function _breakAndChain(r,c){
     const cell=state.map[r][c];
     if(!IS_CRACKED(cell.type))return;
-    const targetType=BASE_OF(cell.type); // 連鎖対象の「同色非ヒビ」タイル種別
-    // ヒビ壁自体を壊す（色タイルに戻すか通路に）
+    const targetType=BASE_OF(cell.type);
     cell.type=BREAK_INTO[cell.type]||'walk';
     cell.hp=null;
-
-    // 上下左右の同色（非ヒビ）タイルを通路化（BFS）
-    if(targetType==='walk')return; // cracked→walk の場合は連鎖なし
-    const queue=[[r,c]];
-    const visited=new Set([`${r},${c}`]);
+    if(targetType==='walk')return;
+    const queue=[[r,c]],visited=new Set([`${r},${c}`]);
     while(queue.length){
       const[cr,cc]=queue.shift();
       for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
@@ -191,11 +180,7 @@ const Piktorioengine = (() => {
         if(nr<0||nr>=state.rows||nc<0||nc>=state.cols)continue;
         visited.add(key);
         const nb=state.map[nr][nc];
-        if(nb.type===targetType){
-          // 同色非ヒビ→通路化
-          nb.type='walk';nb.hp=null;
-          queue.push([nr,nc]);
-        }
+        if(nb.type===targetType){nb.type='walk';nb.hp=null;queue.push([nr,nc]);}
       }
     }
   }
@@ -205,7 +190,6 @@ const Piktorioengine = (() => {
     _setMessage(`ターン ${state.turn} — 移動してください（残り3マス）`);_render();
   }
 
-  // ===== レイアウト =====
   function _getLayout(canvas){
     const BASE=Math.floor(Math.min(canvas.width/state.cols,canvas.height/state.rows));
     const CELL=BASE*MAP_SCALE;
@@ -216,25 +200,20 @@ const Piktorioengine = (() => {
     return{CELL,ox,oy};
   }
 
-  // ===== レンダリング =====
   function _render(){
     const canvas=document.getElementById('piktorioCanvas');if(!canvas)return;
     const ctx=canvas.getContext('2d');
     const{CELL,ox,oy}=_getLayout(canvas);
     const vpW=canvas.width,vpH=canvas.height;
     ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,vpW,vpH);
-
     for(let r=0;r<state.rows;r++)for(let c=0;c<state.cols;c++){
       const x=ox+c*CELL,y=oy+r*CELL;
       if(x+CELL<0||x>vpW||y+CELL<0||y>vpH)continue;
       _drawCell(ctx,r,c,x,y,CELL);
     }
-
     if(state.phase==='player_move'&&state.movesLeft>0)_drawReachable(ctx,CELL,ox,oy);
     if(state.phase==='player_action')_drawActionButtons(ctx,CELL,ox,oy);
-
     _drawPlayer(ctx,CELL,ox,oy);
-
     const pr=state.player.row,pc=state.player.col;
     const cellX=ox+pc*CELL,cellY=oy+pr*CELL;
     if(state.phase==='player_move'){
@@ -242,36 +221,29 @@ const Piktorioengine = (() => {
       _drawCheckmark(ctx,cellX,cellY,CELL);
     }
     if(state.phase==='player_action')_drawCheckmark(ctx,cellX,cellY,CELL);
-
     _drawMinimap(ctx,canvas);
     _updateUI();
   }
 
-  // ===== タイル描画 =====
   function _drawCell(ctx,r,c,x,y,CELL){
     const cell=state.map[r][c];
     if(!_isVisible(r,c)){ctx.fillStyle='#0a0a0a';ctx.fillRect(x,y,CELL,CELL);return;}
     ctx.fillStyle=TILE_FILL[cell.type]||'#333';ctx.fillRect(x,y,CELL,CELL);
-
-    // スタートマス：白枠
     if(r===state.startRow&&c===state.startCol){
       ctx.strokeStyle='rgba(255,255,255,0.7)';
       ctx.lineWidth=Math.max(1.5,CELL*0.05);
       ctx.strokeRect(x+1,y+1,CELL-2,CELL-2);
     }
-
     if(IS_CRACKED(cell.type)){
       _drawCrackPattern(ctx,x,y,CELL,cell.hp);
       _drawHpGauge(ctx,x,y,CELL,cell.hp,cell.type);
     }
-
     const fs=Math.max(9,Math.floor(CELL*0.26));ctx.font=`bold ${fs}px monospace`;
     if(cell.piks.red>0){ctx.fillStyle='#ff9999';ctx.fillText(cell.piks.red,x+3,y+fs+2);}
     if(cell.piks.yellow>0){ctx.fillStyle='#ffee44';ctx.fillText(cell.piks.yellow,x+CELL-ctx.measureText(cell.piks.yellow).width-3,y+fs+2);}
     if(cell.piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(cell.piks.blue,x+3,y+CELL-4);}
   }
 
-  // ===== ヒビ模様 =====
   function _drawCrackPattern(ctx,x,y,CELL,hp){
     const intensity=1-(hp??CRACKED_HP)/CRACKED_HP;
     ctx.save();
@@ -286,44 +258,40 @@ const Piktorioengine = (() => {
     ];
     const count=1+Math.floor(intensity*(cracks.length-1));
     for(let i=0;i<count;i++){
-      ctx.beginPath();ctx.moveTo(cracks[i][0][0],cracks[i][0][1]);ctx.lineTo(cracks[i][1][0],cracks[i][1][1]);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cracks[i][0][0],cracks[i][0][1]);
+      ctx.lineTo(cracks[i][1][0],cracks[i][1][1]);ctx.stroke();
     }
     ctx.restore();
   }
 
-  // ===== 耐久力円グラフ =====
-  // 白枠のみ。最初は白円（満タン）、減ると扇が欠けていく（欠けた部分=背景が透ける）
-  // 反時計回りで欠ける
+  // ===== 円グラフ：枠線のみ、塗り潰しなし =====
+  // 残りHP分だけ「白い弧」を描く。HPが100%=完全な円、0%=何も描かない
+  // 12時スタートで反時計回りに弧が短くなる（欠けていく）
   function _drawHpGauge(ctx,x,y,CELL,hp,type){
-    if(hp===null)return;
+    if(hp===null||hp<=0)return;
     const cx=x+CELL/2,cy=y+CELL/2,r=CELL*0.28;
     const ratio=hp/CRACKED_HP;
-    const strokeColor=GAUGE_STROKE[type]||'rgba(220,220,220,0.8)';
+    const strokeColor=GAUGE_STROKE[type]||'rgba(255,255,255,0.85)';
+    const lineW=Math.max(1,CELL*0.045);
 
-    // 残り部分：白（やや半透明）で扇形を塗る（中心から）
-    if(ratio>0){
-      const startAngle=-Math.PI/2;
-      const endAngle=startAngle-Math.PI*2*ratio; // 反時計回り（残り=欠けた部分）
-      ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.arc(cx,cy,r,startAngle,endAngle,true);
-      ctx.closePath();
-      ctx.fillStyle='rgba(255,255,255,0.45)';
-      ctx.fill();
-    }
+    // 残りHP分の弧（12時=−π/2 スタート、反時計回り）
+    const startAngle=-Math.PI/2;
+    const endAngle=startAngle-Math.PI*2*ratio; // 反時計回りなので引く
 
-    // 外枠のみ（色はタイル種別に応じた色）
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle=strokeColor;ctx.lineWidth=1.2;ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,startAngle,endAngle,true); // true=反時計回り
+    ctx.strokeStyle=strokeColor;
+    ctx.lineWidth=lineW;
+    ctx.lineCap='round';
+    ctx.stroke();
   }
 
   // ===== アクションボタン =====
   function _drawActionButtons(ctx,CELL,ox,oy){
     const pr=state.player.row,pc=state.player.col;
     for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      if(dr===0&&dc===0)continue; // 自分のマスはスキップ
       const r=pr+dr,c=pc+dc;
-      // プレイヤー自身のマスはスキップ
-      if(dr===0&&dc===0)continue;
       if(r<0||r>=state.rows||c<0||c>=state.cols)continue;
       const cell=state.map[r][c],type=cell.type;
       if(type==='wall')continue;
@@ -335,41 +303,32 @@ const Piktorioengine = (() => {
   function _drawCellActionButtons(ctx,x,y,CELL,r,c,type,cell){
     const q=CELL/4;
     const base=BASE_OF(type);
-
     const buttons=[
-      {zone:'topleft',    cx:x+q,   cy:y+q,   color:'red',    bgN:'rgba(200,60,60,0.75)',   bgF:'rgba(255,140,140,0.95)'},
-      {zone:'topright',   cx:x+3*q, cy:y+q,   color:'yellow', bgN:'rgba(180,160,10,0.75)',  bgF:'rgba(255,240,80,0.95)'},
-      {zone:'bottomleft', cx:x+q,   cy:y+3*q, color:'blue',   bgN:'rgba(30,110,210,0.75)',  bgF:'rgba(100,180,255,0.95)'},
-      {zone:'bottomright',cx:x+3*q, cy:y+3*q, color:null,     bgN:'rgba(140,140,140,0.6)',  bgF:'rgba(255,255,255,0.95)'},
+      {zone:'topleft',    cx:x+q,   cy:y+q,   color:'red',    bgN:'rgba(200,60,60,0.75)',  bgF:'rgba(255,150,150,0.97)'},
+      {zone:'topright',   cx:x+3*q, cy:y+q,   color:'yellow', bgN:'rgba(180,160,10,0.75)', bgF:'rgba(255,245,80,0.97)'},
+      {zone:'bottomleft', cx:x+q,   cy:y+3*q, color:'blue',   bgN:'rgba(30,110,210,0.75)', bgF:'rgba(100,190,255,0.97)'},
+      {zone:'bottomright',cx:x+3*q, cy:y+3*q, color:null,     bgN:'rgba(140,140,140,0.6)', bgF:'rgba(255,255,255,0.97)'},
     ];
-
     const btnR=CELL*0.19;
-
     for(const btn of buttons){
       if(btn.zone==='bottomright'){
-        // 回収ボタン：このマスにpikがある場合（タイル種別問わず、壁以外）
         if(type==='wall')continue;
         if(!COLORS.some(col=>cell.piks[col]>0))continue;
       }else{
-        // 置くボタン
-        // 色専用マスは対応色のみ
         if(base==='red'    &&btn.color!=='red')   continue;
         if(base==='blue'   &&btn.color!=='blue')  continue;
         if(base==='yellow' &&btn.color!=='yellow')continue;
-        // 持ちpikがない場合は非表示
         if(state.player.piks[btn.color]<=0)continue;
       }
-
       const flashing=_isFlashing(r,c,btn.zone);
       const bg=flashing?btn.bgF:btn.bgN;
       ctx.beginPath();ctx.arc(btn.cx,btn.cy,btnR,0,Math.PI*2);
       ctx.fillStyle=bg;ctx.fill();
       ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=0.8;ctx.stroke();
-
       if(btn.zone==='bottomright'){
         const hs=btnR*0.52;
         ctx.save();
-        ctx.strokeStyle=flashing?'rgba(0,0,0,0.8)':'rgba(255,255,255,0.9)';
+        ctx.strokeStyle=flashing?'rgba(0,0,0,0.85)':'rgba(255,255,255,0.9)';
         ctx.lineWidth=btnR*0.32;ctx.lineCap='round';
         ctx.beginPath();
         ctx.moveTo(btn.cx-hs,btn.cy-hs);ctx.lineTo(btn.cx+hs,btn.cy+hs);
@@ -377,12 +336,11 @@ const Piktorioengine = (() => {
         ctx.stroke();ctx.restore();
       }else{
         ctx.beginPath();ctx.arc(btn.cx,btn.cy,btnR*0.38,0,Math.PI*2);
-        ctx.fillStyle='rgba(255,255,255,0.7)';ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.75)';ctx.fill();
       }
     }
   }
 
-  // ===== 移動ハイライト =====
   function _drawReachable(ctx,CELL,ox,oy){
     _bfsReachable(state.player.row,state.player.col,state.movesLeft).forEach(([r,c])=>{
       ctx.fillStyle='rgba(255,255,180,0.2)';ctx.fillRect(ox+c*CELL,oy+r*CELL,CELL,CELL);
@@ -398,7 +356,6 @@ const Piktorioengine = (() => {
     }return res;
   }
 
-  // ===== プレイヤー =====
   function _drawPlayer(ctx,CELL,ox,oy){
     const{row,col,piks}=state.player;
     const x=ox+col*CELL,y=oy+row*CELL,cx=x+CELL/2,cy=y+CELL/2,r=CELL*0.28;
@@ -411,7 +368,6 @@ const Piktorioengine = (() => {
     if(piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(piks.blue,x+3,y+CELL-4);}
   }
 
-  // ===== 矢印 =====
   function _drawArrow(ctx,cellX,cellY,CELL,dcol,drow){
     const nr=state.player.row+drow,nc=state.player.col+dcol;
     if(!_canEnter(nr,nc))return;
@@ -423,7 +379,6 @@ const Piktorioengine = (() => {
     ctx.restore();
   }
 
-  // ===== チェックマーク =====
   function _drawCheckmark(ctx,cellX,cellY,CELL){
     const cx=cellX+CELL/2,cy=cellY+CELL/2,s=CELL*0.22;
     ctx.beginPath();ctx.arc(cx,cy,s*1.1,0,Math.PI*2);
@@ -438,7 +393,6 @@ const Piktorioengine = (() => {
     return(px-cx)**2+(py-cy)**2<=r*r;
   }
 
-  // ===== ミニマップ =====
   function _drawMinimap(ctx,canvas){
     const MINI=5,PAD=8,mW=state.cols*MINI,mH=state.rows*MINI;
     const mx=canvas.width-mW-PAD,my=canvas.height-mH-PAD;
@@ -446,21 +400,17 @@ const Piktorioengine = (() => {
     for(let r=0;r<state.rows;r++)for(let c=0;c<state.cols;c++){
       const cell=state.map[r][c],x=mx+c*MINI,y=my+r*MINI;
       if(!_isVisible(r,c)){ctx.fillStyle='#111';ctx.fillRect(x,y,MINI,MINI);continue;}
-
-      // スタートマス：白
       if(r===state.startRow&&c===state.startCol){
         ctx.fillStyle='#ffffff';ctx.fillRect(x,y,MINI,MINI);
       }else{
         ctx.fillStyle=MINI_FILL[cell.type]||'#444';ctx.fillRect(x,y,MINI,MINI);
       }
-
       if(cell.piks.red>0||cell.piks.blue>0||cell.piks.yellow>0){
         let dc='#fff';
         if(cell.piks.red>0)dc='#ff8888';else if(cell.piks.yellow>0)dc='#ffee44';else dc='#66aaff';
         ctx.beginPath();ctx.arc(x+MINI*0.5,y+MINI*0.5,MINI*0.3,0,Math.PI*2);ctx.fillStyle=dc;ctx.fill();
       }
     }
-    // プレイヤー
     const px=mx+state.player.col*MINI+MINI*0.5,py=my+state.player.row*MINI+MINI*0.5;
     ctx.beginPath();ctx.arc(px,py,MINI*0.55,0,Math.PI*2);ctx.fillStyle='#f0efe0';ctx.fill();
     ctx.strokeStyle='#333';ctx.lineWidth=0.8;ctx.stroke();
