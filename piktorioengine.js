@@ -1,73 +1,61 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.9
+// piktorioengine.js — Piktorioゲームエンジン v0.10
 
 const Piktorioengine = (() => {
 
   const COLORS     = ['red','blue','yellow'];
   const MOVE_LIMIT = 3;
   const MAP_SCALE  = 2;
-  const CRACKED_HP = 100;
+  const CRACKED_HP      = 100;
+  const COLOR_CRACKED_HP = 40;  // 色ヒビ壁の耐久力
 
   const CRACKED_BASE = { cracked:'walk', red_cracked:'red', blue_cracked:'blue', yellow_cracked:'yellow' };
   const IS_CRACKED   = t => t in CRACKED_BASE;
   const BASE_OF      = t => CRACKED_BASE[t] || t;
   const BREAK_INTO   = { cracked:'walk', red_cracked:'red', blue_cracked:'blue', yellow_cracked:'yellow' };
+  const DEFAULT_HP   = t => t==='cracked' ? CRACKED_HP : COLOR_CRACKED_HP;
 
   const TILE_FILL = {
-    walk:          '#2d5a1b',
-    wall:          '#5a3010',
-    cracked:       '#4a2808',
-    red:           '#cc3333',
-    blue:          '#2277cc',
-    yellow:        '#aaaa10',
-    red_cracked:   '#cc3333',  // 赤タイルと同色
-    blue_cracked:  '#2277cc',  // 青タイルと同色
-    yellow_cracked:'#aaaa10',  // 黄タイルと同色
+    walk:'#2d5a1b', wall:'#5a3010', cracked:'#4a2808',
+    red:'#cc3333', blue:'#2277cc', yellow:'#aaaa10',
+    red_cracked:'#cc3333', blue_cracked:'#2277cc', yellow_cracked:'#aaaa10',
   };
   const MINI_FILL = {
-    walk:          '#3a7a22',
-    wall:          '#7a4a20',
-    cracked:       '#6a3a18',
-    red:           '#cc4444',
-    blue:          '#3388cc',
-    yellow:        '#aaaa20',
-    red_cracked:   '#cc4444',
-    blue_cracked:  '#3388cc',
-    yellow_cracked:'#aaaa20',
+    walk:'#3a7a22', wall:'#7a4a20', cracked:'#6a3a18',
+    red:'#cc4444', blue:'#3388cc', yellow:'#aaaa20',
+    red_cracked:'#cc4444', blue_cracked:'#3388cc', yellow_cracked:'#aaaa20',
   };
   const GAUGE_STROKE = {
-    cracked:       'rgba(220,220,220,0.85)',
-    red_cracked:   'rgba(255,160,160,0.9)',
-    blue_cracked:  'rgba(120,200,255,0.9)',
+    cracked:'rgba(220,220,220,0.85)',
+    red_cracked:'rgba(255,160,160,0.9)',
+    blue_cracked:'rgba(120,200,255,0.9)',
     yellow_cracked:'rgba(240,240,80,0.9)',
   };
 
   let state = null;
+
+  // フラッシュ（ボタン拡大）管理: key -> { endTime, type }
+  // type: 'button'(ボタン拡大) | 'arrow'(矢印拡大)
   const _flash = {};
-
   function _flashKey(r,c,zone){ return `${r},${c},${zone}`; }
-
-  function _triggerFlash(r,c,zone){
-    const key = _flashKey(r,c,zone);
-    _flash[key] = Date.now() + 160;
-    // フラッシュ開始：即再描画
-    if(state) _render();
-    // フラッシュ終了後：再描画してフラッシュを消す
-    setTimeout(()=>{ if(state) _render(); }, 180);
+  function _triggerFlash(r,c,zone,type='button'){
+    const key=_flashKey(r,c,zone);
+    _flash[key]={end:Date.now()+180, type};
+    if(state)_render();
+    setTimeout(()=>{if(state)_render();},200);
   }
-
-  function _isFlashing(r,c,zone){
-    const t = _flash[_flashKey(r,c,zone)];
-    return t != null && Date.now() < t;
+  function _getFlash(r,c,zone){
+    const f=_flash[_flashKey(r,c,zone)];
+    return (f&&Date.now()<f.end)?f:null;
   }
 
   // ===== 初期化 =====
   function init(mapData){
-    const rows=mapData.tiles.length, cols=mapData.tiles[0].length;
+    const rows=mapData.tiles.length,cols=mapData.tiles[0].length;
     const fogRadius=Math.sqrt((rows/2)**2+(cols/2)**2)+1;
     const tiles=mapData.tiles.map(row=>row.map(cell=>({
       type:cell.type,
       piks:{red:cell.piks?.red||0,blue:cell.piks?.blue||0,yellow:cell.piks?.yellow||0},
-      hp:IS_CRACKED(cell.type)?(cell.hp??CRACKED_HP):null,
+      hp:IS_CRACKED(cell.type)?(cell.hp??DEFAULT_HP(cell.type)):null,
     })));
     const fogMap=Array.from({length:rows},()=>new Array(cols).fill(Infinity));
     state={rows,cols,map:tiles,fogMap,fogRadius,
@@ -125,18 +113,18 @@ const Piktorioengine = (() => {
     if(type==='wall'){_setMessage('壁には操作できません');_render();return;}
     if(zone==='bottomright'){
       if(!COLORS.some(col=>cell.piks[col]>0)){_setMessage('このマスにpikはいません');_render();return;}
-      _triggerFlash(r,c,zone);
+      _triggerFlash(r,c,zone,'button');
       COLORS.forEach(col=>{state.player.piks[col]+=cell.piks[col];cell.piks[col]=0;});
       _setMessage('pikを拾いました');
     }else{
       const colorMap={topleft:'red',topright:'yellow',bottomleft:'blue'};
       const color=colorMap[zone];
       const base=BASE_OF(type);
-      if(base==='red'    &&color!=='red')   {_setMessage('赤マスには赤pikのみ置けます');  _render();return;}
-      if(base==='blue'   &&color!=='blue')  {_setMessage('青マスには青pikのみ置けます');  _render();return;}
-      if(base==='yellow' &&color!=='yellow'){_setMessage('黄マスには黄pikのみ置けます');  _render();return;}
+      if(base==='red'&&color!=='red'){_setMessage('赤マスには赤pikのみ置けます');_render();return;}
+      if(base==='blue'&&color!=='blue'){_setMessage('青マスには青pikのみ置けます');_render();return;}
+      if(base==='yellow'&&color!=='yellow'){_setMessage('黄マスには黄pikのみ置けます');_render();return;}
       if(state.player.piks[color]<=0){_setMessage(`${_colorJa(color)}pikを持っていません`);_render();return;}
-      _triggerFlash(r,c,zone);
+      _triggerFlash(r,c,zone,'button');
       state.player.piks[color]--;cell.piks[color]++;
       _setMessage(`${_colorJa(color)}pikを置きました`);
     }
@@ -225,6 +213,7 @@ const Piktorioengine = (() => {
     _updateUI();
   }
 
+  // ===== タイル描画 =====
   function _drawCell(ctx,r,c,x,y,CELL){
     const cell=state.map[r][c];
     if(!_isVisible(r,c)){ctx.fillStyle='#0a0a0a';ctx.fillRect(x,y,CELL,CELL);return;}
@@ -235,100 +224,125 @@ const Piktorioengine = (() => {
       ctx.strokeRect(x+1,y+1,CELL-2,CELL-2);
     }
     if(IS_CRACKED(cell.type)){
-      _drawCrackPattern(ctx,x,y,CELL,cell.hp);
+      _drawCrackPattern(ctx,x,y,CELL,cell.hp,cell.type);
       _drawHpGauge(ctx,x,y,CELL,cell.hp,cell.type);
     }
-    const fs=Math.max(9,Math.floor(CELL*0.26));ctx.font=`bold ${fs}px monospace`;
-    if(cell.piks.red>0){ctx.fillStyle='#ff9999';ctx.fillText(cell.piks.red,x+3,y+fs+2);}
-    if(cell.piks.yellow>0){ctx.fillStyle='#ffee44';ctx.fillText(cell.piks.yellow,x+CELL-ctx.measureText(cell.piks.yellow).width-3,y+fs+2);}
-    if(cell.piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(cell.piks.blue,x+3,y+CELL-4);}
+    const fs=Math.max(7,Math.floor(CELL*0.26));ctx.font=`bold ${fs}px monospace`;
+    if(cell.piks.red>0){ctx.fillStyle='#ff9999';ctx.fillText(cell.piks.red,x+2,y+fs+1);}
+    if(cell.piks.yellow>0){ctx.fillStyle='#ffee44';ctx.fillText(cell.piks.yellow,x+CELL-ctx.measureText(cell.piks.yellow).width-2,y+fs+1);}
+    if(cell.piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(cell.piks.blue,x+2,y+CELL-3);}
   }
 
-  function _drawCrackPattern(ctx,x,y,CELL,hp){
-    const intensity=1-(hp??CRACKED_HP)/CRACKED_HP;
+  // ===== ヒビ模様：クリップ付きで確実に描画 =====
+  function _drawCrackPattern(ctx,x,y,CELL,hp,type){
+    const maxHp=type==='cracked'?CRACKED_HP:COLOR_CRACKED_HP;
+    const intensity=1-(hp??maxHp)/maxHp;
     ctx.save();
-    ctx.strokeStyle=`rgba(220,180,100,${0.25+intensity*0.55})`;
-    ctx.lineWidth=1;
+    // タイル内にクリップ
+    ctx.beginPath();ctx.rect(x,y,CELL,CELL);ctx.clip();
+    ctx.strokeStyle=`rgba(255,220,130,${0.45+intensity*0.45})`;
+    ctx.lineWidth=Math.max(1,CELL*0.06);
+    ctx.lineCap='round';
     const cx=x+CELL/2,cy=y+CELL/2;
     const cracks=[
-      [[cx,cy],[cx-CELL*0.30,cy-CELL*0.35]],
-      [[cx,cy],[cx+CELL*0.25,cy-CELL*0.30]],
-      [[cx,cy],[cx+CELL*0.10,cy+CELL*0.40]],
-      [[cx,cy],[cx-CELL*0.20,cy+CELL*0.30]],
+      [[cx,cy],[cx-CELL*0.32,cy-CELL*0.38]],
+      [[cx,cy],[cx+CELL*0.28,cy-CELL*0.32]],
+      [[cx,cy],[cx+CELL*0.12,cy+CELL*0.42]],
+      [[cx,cy],[cx-CELL*0.22,cy+CELL*0.32]],
     ];
     const count=1+Math.floor(intensity*(cracks.length-1));
-    for(let i=0;i<count;i++){
+    // HPに関係なく最低1本は常に表示
+    const drawCount=Math.max(1,count);
+    for(let i=0;i<drawCount;i++){
       ctx.beginPath();ctx.moveTo(cracks[i][0][0],cracks[i][0][1]);
       ctx.lineTo(cracks[i][1][0],cracks[i][1][1]);ctx.stroke();
     }
     ctx.restore();
   }
 
-  // ===== 円グラフ：枠線のみ、塗り潰しなし =====
-  // 残りHP分だけ「白い弧」を描く。HPが100%=完全な円、0%=何も描かない
-  // 12時スタートで反時計回りに弧が短くなる（欠けていく）
+  // ===== 円グラフ =====
+  // 100%：枠線（弧）のみ
+  // <100%：扇形（中心から塗り潰し）
+  // 線幅は前バージョンの半分
   function _drawHpGauge(ctx,x,y,CELL,hp,type){
     if(hp===null||hp<=0)return;
+    const maxHp=type==='cracked'?CRACKED_HP:COLOR_CRACKED_HP;
+    const ratio=hp/maxHp;
     const cx=x+CELL/2,cy=y+CELL/2,r=CELL*0.28;
-    const ratio=hp/CRACKED_HP;
     const strokeColor=GAUGE_STROKE[type]||'rgba(255,255,255,0.85)';
-    const lineW=Math.max(1,CELL*0.045);
+    const lineW=Math.max(0.5,CELL*0.022); // 前の半分
 
-    // 残りHP分の弧（12時=−π/2 スタート、反時計回り）
-    const startAngle=-Math.PI/2;
-    const endAngle=startAngle-Math.PI*2*ratio; // 反時計回りなので引く
-
-    ctx.beginPath();
-    ctx.arc(cx,cy,r,startAngle,endAngle,true); // true=反時計回り
-    ctx.strokeStyle=strokeColor;
-    ctx.lineWidth=lineW;
-    ctx.lineCap='round';
-    ctx.stroke();
+    if(ratio>=0.9999){
+      // 100%：枠線（完全な円弧）のみ
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=strokeColor;ctx.lineWidth=lineW;ctx.stroke();
+    }else{
+      // <100%：扇形（反時計回りで欠ける）
+      const startAngle=-Math.PI/2;
+      const endAngle=startAngle-Math.PI*2*ratio; // 反時計回り
+      // 扇形塗り潰し（半透明）
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r,startAngle,endAngle,true);
+      ctx.closePath();
+      ctx.fillStyle='rgba(255,255,255,0.22)';
+      ctx.fill();
+      // 扇形の弧部分のみ枠線
+      ctx.beginPath();
+      ctx.arc(cx,cy,r,startAngle,endAngle,true);
+      ctx.strokeStyle=strokeColor;ctx.lineWidth=lineW;ctx.lineCap='round';ctx.stroke();
+      // 中心からの2本の線
+      const x1=cx+r*Math.cos(startAngle),y1=cy+r*Math.sin(startAngle);
+      const x2=cx+r*Math.cos(endAngle),y2=cy+r*Math.sin(endAngle);
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x1,y1);
+      ctx.moveTo(cx,cy);ctx.lineTo(x2,y2);
+      ctx.strokeStyle=strokeColor;ctx.lineWidth=lineW;ctx.stroke();
+    }
   }
 
   // ===== アクションボタン =====
   function _drawActionButtons(ctx,CELL,ox,oy){
     const pr=state.player.row,pc=state.player.col;
     for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
-      if(dr===0&&dc===0)continue; // 自分のマスはスキップ
+      if(dr===0&&dc===0)continue;
       const r=pr+dr,c=pc+dc;
       if(r<0||r>=state.rows||c<0||c>=state.cols)continue;
       const cell=state.map[r][c],type=cell.type;
       if(type==='wall')continue;
-      const x=ox+c*CELL,y=oy+r*CELL;
-      _drawCellActionButtons(ctx,x,y,CELL,r,c,type,cell);
+      _drawCellActionButtons(ctx,ox+c*CELL,oy+r*CELL,CELL,r,c,type,cell);
     }
   }
 
   function _drawCellActionButtons(ctx,x,y,CELL,r,c,type,cell){
-    const q=CELL/4;
-    const base=BASE_OF(type);
+    const q=CELL/4,base=BASE_OF(type);
+    const baseR=CELL*0.19; // 基本半径
     const buttons=[
-      {zone:'topleft',    cx:x+q,   cy:y+q,   color:'red',    bgN:'rgba(200,60,60,0.75)',  bgF:'rgba(255,150,150,0.97)'},
-      {zone:'topright',   cx:x+3*q, cy:y+q,   color:'yellow', bgN:'rgba(180,160,10,0.75)', bgF:'rgba(255,245,80,0.97)'},
-      {zone:'bottomleft', cx:x+q,   cy:y+3*q, color:'blue',   bgN:'rgba(30,110,210,0.75)', bgF:'rgba(100,190,255,0.97)'},
-      {zone:'bottomright',cx:x+3*q, cy:y+3*q, color:null,     bgN:'rgba(140,140,140,0.6)', bgF:'rgba(255,255,255,0.97)'},
+      {zone:'topleft',    cx:x+q,   cy:y+q,   color:'red',   bgN:'rgba(200,60,60,0.75)',  bgF:'rgba(255,150,150,0.97)'},
+      {zone:'topright',   cx:x+3*q, cy:y+q,   color:'yellow',bgN:'rgba(180,160,10,0.75)', bgF:'rgba(255,245,80,0.97)'},
+      {zone:'bottomleft', cx:x+q,   cy:y+3*q, color:'blue',  bgN:'rgba(30,110,210,0.75)', bgF:'rgba(100,190,255,0.97)'},
+      {zone:'bottomright',cx:x+3*q, cy:y+3*q, color:null,    bgN:'rgba(140,140,140,0.6)', bgF:'rgba(255,255,255,0.97)'},
     ];
-    const btnR=CELL*0.19;
     for(const btn of buttons){
       if(btn.zone==='bottomright'){
         if(type==='wall')continue;
         if(!COLORS.some(col=>cell.piks[col]>0))continue;
       }else{
-        if(base==='red'    &&btn.color!=='red')   continue;
-        if(base==='blue'   &&btn.color!=='blue')  continue;
-        if(base==='yellow' &&btn.color!=='yellow')continue;
+        if(base==='red'&&btn.color!=='red')continue;
+        if(base==='blue'&&btn.color!=='blue')continue;
+        if(base==='yellow'&&btn.color!=='yellow')continue;
         if(state.player.piks[btn.color]<=0)continue;
       }
-      const flashing=_isFlashing(r,c,btn.zone);
-      const bg=flashing?btn.bgF:btn.bgN;
+      const fl=_getFlash(r,c,btn.zone);
+      // 拡大：フラッシュ中は半径1.5倍
+      const btnR=fl?baseR*1.5:baseR;
+      const bg=fl?btn.bgF:btn.bgN;
       ctx.beginPath();ctx.arc(btn.cx,btn.cy,btnR,0,Math.PI*2);
       ctx.fillStyle=bg;ctx.fill();
       ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=0.8;ctx.stroke();
       if(btn.zone==='bottomright'){
         const hs=btnR*0.52;
         ctx.save();
-        ctx.strokeStyle=flashing?'rgba(0,0,0,0.85)':'rgba(255,255,255,0.9)';
+        ctx.strokeStyle=fl?'rgba(0,0,0,0.85)':'rgba(255,255,255,0.9)';
         ctx.lineWidth=btnR*0.32;ctx.lineCap='round';
         ctx.beginPath();
         ctx.moveTo(btn.cx-hs,btn.cy-hs);ctx.lineTo(btn.cx+hs,btn.cy+hs);
@@ -362,19 +376,22 @@ const Piktorioengine = (() => {
     ctx.beginPath();ctx.arc(cx+1,cy+2,r,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fill();
     ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle='#f0efe0';ctx.fill();
     ctx.strokeStyle='#999';ctx.lineWidth=1.5;ctx.stroke();
-    const fs=Math.max(8,Math.floor(CELL*0.24));ctx.font=`bold ${fs}px monospace`;
-    if(piks.red>0){ctx.fillStyle='#ff9999';ctx.fillText(piks.red,x+3,y+fs+2);}
-    if(piks.yellow>0){ctx.fillStyle='#ffee44';ctx.fillText(piks.yellow,x+CELL-ctx.measureText(piks.yellow).width-3,y+fs+2);}
-    if(piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(piks.blue,x+3,y+CELL-4);}
+    const fs=Math.max(7,Math.floor(CELL*0.24));ctx.font=`bold ${fs}px monospace`;
+    if(piks.red>0){ctx.fillStyle='#ff9999';ctx.fillText(piks.red,x+2,y+fs+1);}
+    if(piks.yellow>0){ctx.fillStyle='#ffee44';ctx.fillText(piks.yellow,x+CELL-ctx.measureText(piks.yellow).width-2,y+fs+1);}
+    if(piks.blue>0){ctx.fillStyle='#88ccff';ctx.fillText(piks.blue,x+2,y+CELL-3);}
   }
 
+  // ===== 矢印：フラッシュで拡大 =====
   function _drawArrow(ctx,cellX,cellY,CELL,dcol,drow){
     const nr=state.player.row+drow,nc=state.player.col+dcol;
     if(!_canEnter(nr,nc))return;
-    const cx=cellX+CELL/2+dcol*CELL,cy=cellY+CELL/2+drow*CELL,s=CELL*0.2;
+    const cx=cellX+CELL/2+dcol*CELL,cy=cellY+CELL/2+drow*CELL;
+    const fl=_getFlash(nr,nc,'arrow');
+    const s=CELL*(fl?0.28:0.20); // フラッシュ中は大きく
     ctx.save();ctx.translate(cx,cy);ctx.rotate(Math.atan2(drow,dcol)+Math.PI/2);
     ctx.beginPath();ctx.moveTo(0,-s);ctx.lineTo(s*0.7,s*0.55);ctx.lineTo(-s*0.7,s*0.55);ctx.closePath();
-    ctx.fillStyle='rgba(255,255,220,0.88)';ctx.fill();
+    ctx.fillStyle=fl?'rgba(255,255,160,0.99)':'rgba(255,255,220,0.88)';ctx.fill();
     ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=1;ctx.stroke();
     ctx.restore();
   }
@@ -394,9 +411,9 @@ const Piktorioengine = (() => {
   }
 
   function _drawMinimap(ctx,canvas){
-    const MINI=5,PAD=8,mW=state.cols*MINI,mH=state.rows*MINI;
+    const MINI=4,PAD=6,mW=state.cols*MINI,mH=state.rows*MINI;
     const mx=canvas.width-mW-PAD,my=canvas.height-mH-PAD;
-    ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(mx-2,my-2,mW+4,mH+4);
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(mx-2,my-2,mW+4,mH+4);
     for(let r=0;r<state.rows;r++)for(let c=0;c<state.cols;c++){
       const cell=state.map[r][c],x=mx+c*MINI,y=my+r*MINI;
       if(!_isVisible(r,c)){ctx.fillStyle='#111';ctx.fillRect(x,y,MINI,MINI);continue;}
@@ -412,7 +429,7 @@ const Piktorioengine = (() => {
       }
     }
     const px=mx+state.player.col*MINI+MINI*0.5,py=my+state.player.row*MINI+MINI*0.5;
-    ctx.beginPath();ctx.arc(px,py,MINI*0.55,0,Math.PI*2);ctx.fillStyle='#f0efe0';ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,MINI*0.6,0,Math.PI*2);ctx.fillStyle='#f0efe0';ctx.fill();
     ctx.strokeStyle='#333';ctx.lineWidth=0.8;ctx.stroke();
   }
 
@@ -461,7 +478,11 @@ const Piktorioengine = (() => {
     if(state.phase==='player_move'){
       if(r<0||r>=state.rows||c<0||c>=state.cols)return;
       const dr=r-pr,dc=c-pc;
-      if(Math.abs(dr)+Math.abs(dc)===1&&_canEnter(r,c))movePlayer(dr,dc);
+      if(Math.abs(dr)+Math.abs(dc)===1&&_canEnter(r,c)){
+        // 矢印フラッシュ
+        _triggerFlash(r,c,'arrow','arrow');
+        movePlayer(dr,dc);
+      }
       return;
     }
     if(state.phase==='player_action'){

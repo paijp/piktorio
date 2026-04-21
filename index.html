@@ -35,10 +35,10 @@
   <div id="legend">
     <div class="leg"><div class="leg-box" style="background:#2d5a1b"></div>通路</div>
     <div class="leg"><div class="leg-box" style="background:#5a3010"></div>壁</div>
-    <div class="leg"><div class="leg-box" style="background:#4a2808"></div>ヒビ壁</div>
-    <div class="leg"><div class="leg-box" style="background:#cc3333"></div>赤/赤ヒビ</div>
-    <div class="leg"><div class="leg-box" style="background:#2277cc"></div>青/青ヒビ</div>
-    <div class="leg"><div class="leg-box" style="background:#aaaa10"></div>黄/黄ヒビ</div>
+    <div class="leg"><div class="leg-box" style="background:#4a2808"></div>ヒビ壁(HP100)</div>
+    <div class="leg"><div class="leg-box" style="background:#cc3333"></div>赤/赤ヒビ(HP40)</div>
+    <div class="leg"><div class="leg-box" style="background:#2277cc"></div>青/青ヒビ(HP40)</div>
+    <div class="leg"><div class="leg-box" style="background:#aaaa10"></div>黄/黄ヒビ(HP40)</div>
   </div>
 </div>
 <script src="piktorioengine.js"></script>
@@ -55,43 +55,61 @@ const B  = { type: 'blue'   };
 const Y  = { type: 'yellow' };
 
 const mapData = {
-  playerStart: [10, 10],
+  playerStart: [20, 20],
   tiles: [
-    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
-    [ BK,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK,  W, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK, BK,  W, BK, BK,  W, BK ],
-    [ BK,  W, BK,  W,  W,  W, BK, WL(3,0,0), BK, W, BK, W,  W,  W,  W,  W, BK,  W,  W, BK ],
-    [ BK,  W, BK, BK, BK, RC,  R, RC, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK,  W, BK ],
-    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK, BK, BK,  W, BK, BK, CR, CR, CR,  W, BK, BC,  B, BK, BK, BK, BK, BK, BK, BK ],
-    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK, BK,  W, BK, BK, YC,  Y,  W, BK, BK, BK,  W, BK, BK, BK, BK,  W, BK ],
-    [ BK,  W,  W, BK,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
-    [ BK,  W, BK, BK,  W,  W,  W,  W, WL(0,2,0), W, W, W, BK, BK,  W,  W,  W, BK, W, BK ],
-    [ BK,  W,  W,  W,  W, BK, CR,  W,  W,  W, BK,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
-    [ BK, BK, BK,  W, BK, BK,  W,  W,  W, BK,  W,  W, BK, BK,  W,  W, BK, BK,  W, BK ],
-    [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK, BK, BK, RC,  R, BK,  W, BK, YC,  Y, BK,  W, BK, BK, BK, BK,  W, BK ],
-    [ BK,  W,  W,  W,  W,  W, CR,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK, BK,  W, BK, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK, BK ],
-    [ BK,  W,  W,  W,  W, WL(0,0,2), W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK,  W, BK,  W, BK, BC,  B,  W, BK,  W, BK,  W, BK,  W, BK,  W, BK, BK ],
-    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
+    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, WL(3,0,0), W, W, W, WL(0,3,0), W, W, BK, W, WL(0,0,3), W, W, BK, W, WL(2,1,0), W, W, W, W, WL(0,2,1), W, W, BK, W, WL(1,0,2), W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, RC, R, RC, W, BC, B, BC, W, BK, YC, Y, YC, W, BK, RC, R, RC, W, W, BC, B, BC, W, BK, YC, Y, YC, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, YC, Y, YC, W, RC, R, RC, W, BK, BC, B, BC, W, BK, YC, Y, YC, W, W, RC, R, RC, W, BK, BC, B, BC, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, WL(0,0,2), W, W, W, WL(2,0,0), W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, WL(0,2,0), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, BK, BK, BK, W, BK, BK, BK, W, BK, BK, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, BC, B, BC, W, W, W, W, W, BK, BK, BK, W, BK, BK, BK, W, BK, BK, W, YC, Y, YC, W, BK, RC, R, RC, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, WL(1,1,0), W, W, W, W, W, W, BK, BK, BK, W, BK, BK, BK, W, BK, BK, W, W, WL(0,1,1), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, BK, BK, BK, W, BK, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, RC, R, RC, W, BC, B, BC, W, BK, BK, BK, W, BK, BK, RC, R, RC, W, W, YC, Y, YC, W, BK, BC, B, BC, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, BK, BK, BK, W, BK, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, WL(2,0,1), W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, WL(1,2,0), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, Y, W, W, W, R, W, W, BK, W, B, W, W, BK, W, Y, W, W, WL(1,1,1), W, R, W, W, BK, W, B, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, W, W, W, W, W, W, W, W, W, W, W, W, WL(2,0,0), W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, B, W, W, W, Y, W, W, BK, W, R, W, W, BK, W, B, W, W, W, W, Y, W, W, BK, W, R, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, R, W, W, W, B, W, W, BK, W, Y, W, W, BK, W, R, W, W, W, W, B, W, W, BK, W, Y, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, WL(0,1,2), W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, WL(2,1,0), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, Y, W, W, W, R, W, W, BK, W, B, W, W, BK, W, Y, W, W, W, W, R, W, W, BK, W, B, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, WL(3,0,0), W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, WL(0,0,3), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, W, W, CR, W, W, W, CR, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, B, W, W, W, Y, W, W, BK, W, R, W, W, BK, W, B, W, W, W, W, Y, W, W, BK, W, R, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, W, W, WL(0,2,1), W, W, W, W, W, W, BK, W, W, W, W, BK, W, W, W, W, W, W, WL(1,0,2), W, W, BK, W, W, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, R, W, W, W, B, W, W, BK, W, Y, W, W, BK, W, R, W, W, W, W, B, W, W, BK, W, Y, W, W, BK, W, W, W, BK, W, W, W, W, BK ],
+    [ BK, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, BK ],
+    [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
   ],
 };
 
 function resizeCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
   const wrap=document.getElementById('canvasWrap');
-  const size=Math.floor(Math.min(wrap.clientWidth,wrap.clientHeight)/20)*20;
+  const size=Math.floor(Math.min(wrap.clientWidth,wrap.clientHeight)/40)*40;
   if(size<=0)return;
   canvas.width=size;canvas.height=size;
   if(window._piktorioReady)Piktorioengine.init(mapData);
 }
-
 function bindCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
-  // タップのみ（スワイプ廃止）
   canvas.addEventListener('touchstart',e=>{e.preventDefault();},{passive:false});
   canvas.addEventListener('touchend',e=>{
     e.preventDefault();
@@ -99,7 +117,6 @@ function bindCanvas(){
   },{passive:false});
   canvas.addEventListener('click',e=>Piktorioengine.handleCanvasClick(e));
 }
-
 window.addEventListener('DOMContentLoaded',()=>{
   resizeCanvas();bindCanvas();
   window._piktorioReady=true;
