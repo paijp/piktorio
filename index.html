@@ -35,11 +35,10 @@
   <div id="legend">
     <div class="leg"><div class="leg-box" style="background:#2d5a1b"></div>通路</div>
     <div class="leg"><div class="leg-box" style="background:#5a3010"></div>壁</div>
-    <div class="leg"><div class="leg-box" style="background:#4a2808"></div>ヒビ壁(HP100)</div>
-    <div class="leg"><div class="leg-box" style="background:#6b1a1a"></div>赤専用</div>
-    <div class="leg"><div class="leg-box" style="background:#1a4a6b"></div>青専用</div>
-    <div class="leg"><div class="leg-box" style="background:#5a5a10"></div>黄専用</div>
-    <div class="leg">●=pik置く ×=拾う ●=ターン終了</div>
+    <div class="leg"><div class="leg-box" style="background:#4a2808"></div>ヒビ壁</div>
+    <div class="leg"><div class="leg-box" style="background:#7a1a1a"></div>赤ヒビ→連鎖</div>
+    <div class="leg"><div class="leg-box" style="background:#113d77"></div>青ヒビ→連鎖</div>
+    <div class="leg"><div class="leg-box" style="background:#5a5a08"></div>黄ヒビ→連鎖</div>
   </div>
 </div>
 <script src="piktorioengine.js"></script>
@@ -48,7 +47,9 @@ const W  = { type: 'walk' };
 const WL = (r,b,y) => ({ type:'walk', piks:{red:r||0,blue:b||0,yellow:y||0} });
 const BK = { type: 'wall' };
 const CR = { type: 'cracked' };
-const CL = (hp) => ({ type:'cracked', hp });
+const RC = { type: 'red_cracked' };
+const BC = { type: 'blue_cracked' };
+const YC = { type: 'yellow_cracked' };
 const R  = { type: 'red'    };
 const B  = { type: 'blue'   };
 const Y  = { type: 'yellow' };
@@ -60,21 +61,21 @@ const mapData = {
     [ BK,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W, BK ],
     [ BK,  W, BK,  W, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK, BK,  W, BK, BK,  W, BK ],
     [ BK,  W, BK,  W,  W,  W, BK, WL(3,0,0), BK, W, BK, W,  W,  W,  W,  W, BK,  W,  W, BK ],
-    [ BK,  W, BK, BK, BK,  R,  R,  R, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK,  W, BK ],
+    [ BK,  W, BK, BK, BK, RC,  R, RC, BK,  W, BK, BK, BK,  W, BK,  W, BK, BK,  W, BK ],
     [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK, BK, BK,  W, BK, BK, CR, CR, CR,  W, BK,  B,  B, BK, BK, BK, BK, BK, BK, BK ],
+    [ BK, BK, BK,  W, BK, BK, CR, CR, CR,  W, BK, BC,  B, BK, BK, BK, BK, BK, BK, BK ],
     [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK, BK,  W, BK, BK,  Y,  Y,  W, BK, BK, BK,  W, BK, BK, BK, BK,  W, BK ],
+    [ BK,  W, BK, BK,  W, BK, BK, YC,  Y,  W, BK, BK, BK,  W, BK, BK, BK, BK,  W, BK ],
     [ BK,  W,  W, BK,  W, BK,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
     [ BK,  W, BK, BK,  W,  W,  W,  W, WL(0,2,0), W, W, W, BK, BK,  W,  W,  W, BK, W, BK ],
     [ BK,  W,  W,  W,  W, BK, CR,  W,  W,  W, BK,  W,  W,  W,  W, BK,  W,  W,  W, BK ],
     [ BK, BK, BK,  W, BK, BK,  W,  W,  W, BK,  W,  W, BK, BK,  W,  W, BK, BK,  W, BK ],
     [ BK,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK, BK, BK,  R,  R, BK,  W, BK,  Y,  Y, BK,  W, BK, BK, BK, BK,  W, BK ],
+    [ BK,  W, BK, BK, BK, RC,  R, BK,  W, BK, YC,  Y, BK,  W, BK, BK, BK, BK,  W, BK ],
     [ BK,  W,  W,  W,  W,  W, CR,  W,  W,  W,  W,  W, BK,  W,  W,  W,  W,  W,  W, BK ],
     [ BK, BK,  W, BK, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK,  W, BK, BK, BK, BK ],
     [ BK,  W,  W,  W,  W, WL(0,0,2), W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W,  W, BK ],
-    [ BK,  W, BK,  W, BK,  W, BK,  B,  B,  W, BK,  W, BK,  W, BK,  W, BK,  W, BK, BK ],
+    [ BK,  W, BK,  W, BK,  W, BK, BC,  B,  W, BK,  W, BK,  W, BK,  W, BK,  W, BK, BK ],
     [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
   ],
 };
