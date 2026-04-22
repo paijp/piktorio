@@ -126,10 +126,24 @@ function bindCanvas(){
   },{passive:false});
   canvas.addEventListener('click',e=>Piktorioengine.handleCanvasClick(e));
 }
+window.onerror=function(msg,src,line,col,err){
+  const el=document.getElementById('debugLog');
+  if(el) el.value='ERROR: '+msg+' ('+src+':'+line+':'+col+')
+'+(err?err.stack:'');
+  document.getElementById('piktorioMessage').textContent='エラー: '+msg;
+  return true;
+};
 window.addEventListener('DOMContentLoaded',()=>{
-  resizeCanvas();bindCanvas();
-  window._piktorioReady=true;
-  Piktorioengine.init(mapData);
+  try{
+    resizeCanvas();bindCanvas();
+    window._piktorioReady=true;
+    Piktorioengine.init(mapData);
+  }catch(e){
+    const el=document.getElementById('debugLog');
+    if(el) el.value='INIT ERROR: '+e.message+'
+'+e.stack;
+    document.getElementById('piktorioMessage').textContent='初期化エラー: '+e.message;
+  }
 });
 let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(resizeCanvas,150);});
 </script>
