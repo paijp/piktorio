@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.13.2-debug
+// piktorioengine.js — Piktorioゲームエンジン v0.14
 
 const Piktorioengine = (() => {
 
@@ -107,7 +107,10 @@ const Piktorioengine = (() => {
 
   function _canEnter(r,c){
     if(r<0||r>=state.rows||c<0||c>=state.cols) return false;
-    return state.map[r][c].type==='walk';
+    if(state.map[r][c].type!=='walk') return false;
+    // エサのいるマスには進入不可
+    if(state&&state.foods&&state.foods.some(f=>f.row===r&&f.col===c)) return false;
+    return true;
   }
 
   function _isReachableForAction(r,c){
@@ -187,31 +190,66 @@ const Piktorioengine = (() => {
   }
 
   // ===== エサターン =====
-  function _runFoodTurn(){
-    const arrived=[];
+  // エサを1マス動かしてスタート到達チェック、到達リストを返す
+  function _foodStep1(arrived){
     for(const food of state.foods){
       const fromCell=state.map[food.row][food.col];
       const total=fromCell.piks.red+fromCell.piks.blue+fromCell.piks.yellow;
-      if(total<food.weight){ _dbgLog(`food#${food.id}(${food.color}w${food.weight}) at(${food.row},${food.col}) skip pik=${total}<${food.weight}`); continue; }
-      const steps=(total>=food.weight*2)?2:1;
-      for(let s=0;s<steps;s++){
-        const next=_foodNextCell(food.row,food.col,food.color);
-        if(next===null) break;
-        // 移動元のpikを全て移動先へ運ぶ
-        const src=state.map[food.row][food.col];
-        const dst=state.map[next[0]][next[1]];
-        COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
-        _dbgLog(`food#${food.id}(${food.color}w${food.weight}) move→(${next[0]},${next[1]}) pik=r${dst.piks.red}/b${dst.piks.blue}/y${dst.piks.yellow}`);
-        food.row=next[0]; food.col=next[1];
-        if(food.row===state.startRow&&food.col===state.startCol){
-          arrived.push(food); break;
-        }
-      }
+      if(total<food.weight){ _dbgLog(`food#${food.id}(${food.color}w${food.weight}) skip pik=${total}<${food.weight}`); food._steps=0; continue; }
+      food._steps=(total>=food.weight*2)?2:1;
+      const next=_foodNextCell(food.row,food.col,food.color);
+      if(next===null){ food._steps=0; continue; }
+      const src=state.map[food.row][food.col];
+      const dst=state.map[next[0]][next[1]];
+      COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
+      _dbgLog(`food#${food.id}(${food.color}w${food.weight}) move1→(${next[0]},${next[1]})`);
+      food.row=next[0]; food.col=next[1];
+      if(food.row===state.startRow&&food.col===state.startCol) arrived.push(food);
     }
+  }
+
+  // 2マス移動のエサが残っていれば2歩目を動かす
+  function _foodStep2(arrived){
+    for(const food of state.foods){
+      if(!food._steps||food._steps<2) continue;
+      if(arrived.some(f=>f.id===food.id)) continue; // 既に到達済み
+      const next=_foodNextCell(food.row,food.col,food.color);
+      if(next===null) continue;
+      const src=state.map[food.row][food.col];
+      const dst=state.map[next[0]][next[1]];
+      COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
+      _dbgLog(`food#${food.id}(${food.color}w${food.weight}) move2→(${next[0]},${next[1]})`);
+      food.row=next[0]; food.col=next[1];
+      if(food.row===state.startRow&&food.col===state.startCol) arrived.push(food);
+    }
+  }
+
+  function _foodArrive(arrived){
     for(const food of arrived){
-      // スタートマスにエサ色のpikをエサ重さ分追加（運んできたpikはそのままスタートマスに残る）
       state.map[state.startRow][state.startCol].piks[food.color]+=food.weight;
+      _dbgLog(`food#${food.id}(${food.color}w${food.weight}) ARRIVED +${food.weight}pik`);
       state.foods=state.foods.filter(f=>f.id!==food.id);
+    }
+  }
+
+  // エサターン：1歩目→描画→150ms→2歩目→描画→onDone
+  function _runFoodTurn(onDone){
+    const arrived=[];
+    _foodStep1(arrived);
+    _foodArrive(arrived);
+    _render();
+    // 2歩目が必要なエサがあれば待機してから実行
+    const needStep2=state.foods.some(f=>f._steps===2);
+    if(needStep2){
+      setTimeout(()=>{
+        const arrived2=[];
+        _foodStep2(arrived2);
+        _foodArrive(arrived2);
+        _render();
+        onDone();
+      },150);
+    } else {
+      onDone();
     }
   }
 
@@ -235,6 +273,10 @@ const Piktorioengine = (() => {
         if(visited.has(key(nr,nc))) continue;
         const cell=state.map[nr][nc];
         if(!_foodCanPass(cell,foodColor,nr,nc)) continue;
+        // プレイヤーのいるマスは通過不可
+        if(nr===state.player.row&&nc===state.player.col) continue;
+        // 他エサのいるマスは通過不可
+        if(state.foods.some(f=>f!==undefined&&f.row===nr&&f.col===nc)) continue;
         visited.set(key(nr,nc), [r,c]);
         if(nr===sr&&nc===sc){
           // 経路を逆トレースして最初の1歩を返す
@@ -253,18 +295,18 @@ const Piktorioengine = (() => {
 
   function _foodCanPass(cell,foodColor,nr,nc){
     const t=cell.type;
-    if(t==='wall'){ _dbgLog(`canPass(${nr},${nc}) BLOCK wall`); return false; }
-    if(t==='walk'||t==='cracked') return true;
-    if(t==='red_cracked'||t==='blue_cracked'||t==='yellow_cracked'){ _dbgLog(`canPass(${nr},${nc}) BLOCK cracked ${t}`); return false; }
+    // walk のみ無条件通過
+    if(t==='walk') return true;
+    // 色壁: そのマスのpikが全て同色なら通過可
     if(t==='red'||t==='blue'||t==='yellow'){
       const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
       if(total===0){ _dbgLog(`canPass(${nr},${nc}) BLOCK color-wall ${t} no-pik`); return false; }
-      const same=cell.piks[t];
-      const ok=same===total;
-      _dbgLog(`canPass(${nr},${nc}) ${t} piks=r${cell.piks.red}/b${cell.piks.blue}/y${cell.piks.yellow} → ${ok?'OK':'BLOCK'}`);
+      const ok=cell.piks[t]===total;
+      if(!ok) _dbgLog(`canPass(${nr},${nc}) BLOCK color-wall ${t} mixed-pik`);
       return ok;
     }
-    _dbgLog(`canPass(${nr},${nc}) BLOCK unknown ${t}`);
+    // それ以外（wall/cracked/色ヒビ壁）はすべて通過不可
+    _dbgLog(`canPass(${nr},${nc}) BLOCK ${t}`);
     return false;
   }
 
@@ -577,8 +619,9 @@ const Piktorioengine = (() => {
       // 矢印は2マス先に描画。タップ先が同軸1〜2マス先なら隣1マスへ移動
       if(state.movesLeft>0){
         const adR=Math.abs(dr), adC=Math.abs(dc_);
-        const straight=(adR===0&&adC>=1&&adC<=2)||(adC===0&&adR>=1&&adR<=2);
-        if(straight){
+        // 矢印は2マス先に表示。2マス先のタップのみ移動（1マス先はアクション扱い）
+        const isArrow=(adR===0&&adC===2)||(adC===0&&adR===2);
+        if(isArrow){
           const mdr=dr===0?0:(dr>0?1:-1), mdc=dc_===0?0:(dc_>0?1:-1);
           if(_canEnter(state.player.row+mdr,state.player.col+mdc)){
             _triggerFlash(state.player.row+mdr,state.player.col+mdc,'arrow');
