@@ -184,9 +184,12 @@ const Piktorioengine = (() => {
     }
     for(const[r,c] of damaged) _triggerFlash(r,c,'cracked_hit');
     for(const[r,c] of broken) _breakAndChain(r,c);
-    _runFoodTurn();
     state.phase='enemy'; _setMessage('敵ターン中…');
-    setTimeout(()=>{ _render(); setTimeout(_runEnemyTurn, 400); }, 260);
+    setTimeout(()=>{
+      _runFoodTurn(()=>{
+        _render(); setTimeout(_runEnemyTurn, 300);
+      });
+    }, 260);
   }
 
   // ===== エサターン =====
