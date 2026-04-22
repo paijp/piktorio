@@ -1,8 +1,11 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.12
+// piktorioengine.js — Piktorioゲームエンジン v0.13
 
 const Piktorioengine = (() => {
 
   const COLORS      = ['red','blue','yellow'];
+  const FOOD_WEIGHTS = [1, 5, 10];
+  const FOOD_COLOR_FILL = { red:'#cc3333', blue:'#2277cc', yellow:'#aaaa10' };
+  const FOOD_COLOR_STROKE = { red:'#ff8888', blue:'#88ccff', yellow:'#ffee44' };
   const MOVE_LIMIT  = 3;
   const CRACKED_HP       = 100;
   const COLOR_CRACKED_HP =  40;
@@ -59,7 +62,12 @@ const Piktorioengine = (() => {
       hp:IS_CRACKED(cell.type)?(cell.hp??DEFAULT_HP(cell.type)):null,
     })));
     const fogMap=Array.from({length:rows},()=>new Array(cols).fill(false));
-    state={rows,cols,map:tiles,fogMap,
+    // mapData.foodsからエサリストを構築
+    const foods=(mapData.foods||[]).map((f,i)=>({
+      id:i, color:f.color, weight:f.weight,
+      row:f.row, col:f.col,
+    }));
+    state={rows,cols,map:tiles,fogMap,foods,
       startRow:mapData.playerStart[0], startCol:mapData.playerStart[1],
       player:{row:mapData.playerStart[0], col:mapData.playerStart[1], piks:{red:0,blue:0,yellow:0}},
       phase:'player', movesLeft:MOVE_LIMIT, turn:1, message:'移動してください'};
@@ -165,8 +173,84 @@ const Piktorioengine = (() => {
     }
     for(const[r,c] of damaged) _triggerFlash(r,c,'cracked_hit');
     for(const[r,c] of broken) _breakAndChain(r,c);
+    _runFoodTurn();
     state.phase='enemy'; _setMessage('敵ターン中…');
     setTimeout(()=>{ _render(); setTimeout(_runEnemyTurn, 400); }, 260);
+  }
+
+  // ===== エサターン =====
+  function _runFoodTurn(){
+    const arrived=[];
+    for(const food of state.foods){
+      const cell=state.map[food.row][food.col];
+      const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
+      if(total<food.weight) continue; // pikが足りない
+      const steps=(total>=food.weight*2)?2:1;
+      for(let s=0;s<steps;s++){
+        const next=_foodNextCell(food.row,food.col,food.color);
+        if(next===null) break;
+        food.row=next[0]; food.col=next[1];
+        if(food.row===state.startRow&&food.col===state.startCol){
+          arrived.push(food); break;
+        }
+      }
+    }
+    for(const food of arrived){
+      // スタートマスにエサ色のpikをエサ重さ分追加
+      state.map[state.startRow][state.startCol].piks[food.color]+=food.weight;
+      state.foods=state.foods.filter(f=>f.id!==food.id);
+    }
+  }
+
+  // エサの次の移動先をBFS最短経路で1マス返す
+  function _foodNextCell(fr,fc,foodColor){
+    // BFSでスタートマスへの最短経路を探す
+    // 通過可能条件:
+    //   walk/cracked/色ヒビ壁: 常に通過可
+    //   色壁(red/blue/yellow): そのマスのpikが全て同色であれば通過可
+    const sr=state.startRow, sc=state.startCol;
+    if(fr===sr&&fc===sc) return null;
+    const key=(r,c)=>r*200+c;
+    const visited=new Map();
+    visited.set(key(fr,fc), null);
+    const queue=[[fr,fc]];
+    while(queue.length){
+      const[r,c]=queue.shift();
+      for(const[dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=state.rows||nc<0||nc>=state.cols) continue;
+        if(visited.has(key(nr,nc))) continue;
+        const cell=state.map[nr][nc];
+        if(!_foodCanPass(cell,foodColor)) continue;
+        visited.set(key(nr,nc), [r,c]);
+        if(nr===sr&&nc===sc){
+          // 経路を逆トレースして最初の1歩を返す
+          let cur=[nr,nc];
+          while(true){
+            const prev=visited.get(key(cur[0],cur[1]));
+            if(prev[0]===fr&&prev[1]===fc) return cur;
+            cur=prev;
+          }
+        }
+        queue.push([nr,nc]);
+      }
+    }
+    return null; // 経路なし
+  }
+
+  function _foodCanPass(cell,foodColor){
+    const t=cell.type;
+    if(t==='wall') return false;
+    // walk, cracked, 色ヒビ壁: 常に通過可
+    if(t==='walk'||t==='cracked'||t==='red_cracked'||t==='blue_cracked'||t==='yellow_cracked') return true;
+    // 色壁(red/blue/yellow): そのマスのpikが全て同色なら通過可
+    if(t==='red'||t==='blue'||t==='yellow'){
+      const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
+      if(total===0) return false;
+      const same=cell.piks[t];
+      return same===total;
+    }
+    return false;
   }
 
   function _breakAndChain(r,c){
@@ -247,6 +331,32 @@ const Piktorioengine = (() => {
     if(cell.piks.red>0)    { ctx.fillStyle='#ff9999'; ctx.fillText(cell.piks.red,    x+2,y+fs+1); }
     if(cell.piks.yellow>0) { ctx.fillStyle='#ffee44'; ctx.fillText(cell.piks.yellow, x+CELL-ctx.measureText(cell.piks.yellow).width-2,y+fs+1); }
     if(cell.piks.blue>0)   { ctx.fillStyle='#88ccff'; ctx.fillText(cell.piks.blue,   x+2,y+CELL-3); }
+    // エサ描画
+    for(const food of state.foods){
+      if(food.row===r&&food.col===c) _drawFood(ctx,x,y,CELL,food);
+    }
+  }
+
+  // ===== エサ描画 =====
+  function _drawFood(ctx,x,y,CELL,food){
+    const cx=x+CELL/2, cy=y+CELL/2;
+    const r=CELL*0.30;
+    // 影
+    ctx.beginPath(); ctx.arc(cx+1,cy+2,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
+    // 塗り
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=FOOD_COLOR_FILL[food.color]||'#888'; ctx.fill();
+    // 縁
+    ctx.strokeStyle=FOOD_COLOR_STROKE[food.color]||'#ccc';
+    ctx.lineWidth=Math.max(1,CELL*0.05); ctx.stroke();
+    // 重さ数字
+    const fs=Math.max(7,Math.floor(CELL*0.28));
+    ctx.font=`bold ${fs}px monospace`;
+    ctx.fillStyle='#fff';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(food.weight),cx,cy+1);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
   }
 
   function _drawHpGauge(ctx,x,y,CELL,hp,type){
@@ -397,6 +507,13 @@ const Piktorioengine = (() => {
         if(cell.piks.red>0) dc='#ff8888'; else if(cell.piks.yellow>0) dc='#ffee44'; else dc='#66aaff';
         ctx.beginPath(); ctx.arc(x+M*0.5,y+M*0.5,M*0.3,0,Math.PI*2); ctx.fillStyle=dc; ctx.fill();
       }
+    }
+    // エサ（ミニマップ）
+    for(const food of state.foods){
+      if(!_isVisible(food.row,food.col)) continue;
+      const fx=mx+food.col*M+M*0.5, fy=my+food.row*M+M*0.5;
+      ctx.beginPath(); ctx.arc(fx,fy,M*0.55,0,Math.PI*2);
+      ctx.fillStyle=FOOD_COLOR_FILL[food.color]||'#888'; ctx.fill();
     }
     const px=mx+state.player.col*M+M*0.5, py=my+state.player.row*M+M*0.5;
     ctx.beginPath(); ctx.arc(px,py,M*0.65,0,Math.PI*2); ctx.fillStyle='#f0efe0'; ctx.fill();
