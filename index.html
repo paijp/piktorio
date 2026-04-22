@@ -18,6 +18,7 @@
   #piktorioCanvas{border:1px solid #1a2a10;cursor:pointer;image-rendering:pixelated;touch-action:none}
   #legend{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:clamp(0.5rem,1.5vw,0.62rem);color:#555;justify-content:center;flex-shrink:0;padding:0 4px 2px}
   .leg{display:flex;align-items:center;gap:3px}.leg-box{width:8px;height:8px;flex-shrink:0}
+  #debugLog{width:100%;max-width:560px;height:80px;background:#111;color:#8f8;font-size:0.6rem;font-family:monospace;border:1px solid #333;resize:none;flex-shrink:0;padding:2px 4px;box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -40,6 +41,7 @@
     <div class="leg"><div class="leg-box" style="background:#2277cc"></div>青/青ヒビ(HP40)</div>
     <div class="leg"><div class="leg-box" style="background:#aaaa10"></div>黄/黄ヒビ(HP40)</div>
   </div>
+  <textarea id="debugLog" readonly placeholder="デバッグログ…"></textarea>
 </div>
 <script src="piktorioengine.js"></script>
 <script>
