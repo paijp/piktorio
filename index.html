@@ -128,8 +128,7 @@ function bindCanvas(){
 }
 window.onerror=function(msg,src,line,col,err){
   const el=document.getElementById('debugLog');
-  if(el) el.value='ERROR: '+msg+' ('+src+':'+line+':'+col+')
-'+(err?err.stack:'');
+  if(el) el.value='ERROR: '+msg+' ('+src+':'+line+':'+col+')\n'+(err?err.stack:'');
   document.getElementById('piktorioMessage').textContent='エラー: '+msg;
   return true;
 };
