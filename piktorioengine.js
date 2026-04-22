@@ -508,13 +508,6 @@ const Piktorioengine = (() => {
         ctx.beginPath(); ctx.arc(x+M*0.5,y+M*0.5,M*0.3,0,Math.PI*2); ctx.fillStyle=dc; ctx.fill();
       }
     }
-    // エサ（ミニマップ）
-    for(const food of state.foods){
-      if(!_isVisible(food.row,food.col)) continue;
-      const fx=mx+food.col*M+M*0.5, fy=my+food.row*M+M*0.5;
-      ctx.beginPath(); ctx.arc(fx,fy,M*0.55,0,Math.PI*2);
-      ctx.fillStyle=FOOD_COLOR_FILL[food.color]||'#888'; ctx.fill();
-    }
     const px=mx+state.player.col*M+M*0.5, py=my+state.player.row*M+M*0.5;
     ctx.beginPath(); ctx.arc(px,py,M*0.65,0,Math.PI*2); ctx.fillStyle='#f0efe0'; ctx.fill();
     ctx.strokeStyle='#333'; ctx.lineWidth=0.8; ctx.stroke();
