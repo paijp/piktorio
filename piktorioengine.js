@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.13.1
+// piktorioengine.js — Piktorioゲームエンジン v0.13.2-debug
 
 const Piktorioengine = (() => {
 
@@ -37,6 +37,15 @@ const Piktorioengine = (() => {
   const MINI_PX = 4;
 
   let state = null;
+
+  // ===== デバッグログ =====
+  function _dbgLog(msg){
+    const el=document.getElementById('debugLog');
+    if(!el) return;
+    const ts=new Date().toLocaleTimeString('ja-JP',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    el.value=(ts+' '+msg+'
+'+el.value).slice(0,4000);
+  }
 
   // ===== フラッシュ管理 =====
   const _flash = {};
@@ -184,7 +193,7 @@ const Piktorioengine = (() => {
     for(const food of state.foods){
       const fromCell=state.map[food.row][food.col];
       const total=fromCell.piks.red+fromCell.piks.blue+fromCell.piks.yellow;
-      if(total<food.weight) continue; // pikが足りない
+      if(total<food.weight){ _dbgLog(`food#${food.id}(${food.color}w${food.weight}) at(${food.row},${food.col}) skip pik=${total}<${food.weight}`); continue; }
       const steps=(total>=food.weight*2)?2:1;
       for(let s=0;s<steps;s++){
         const next=_foodNextCell(food.row,food.col,food.color);
@@ -193,6 +202,7 @@ const Piktorioengine = (() => {
         const src=state.map[food.row][food.col];
         const dst=state.map[next[0]][next[1]];
         COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
+        _dbgLog(`food#${food.id}(${food.color}w${food.weight}) move→(${next[0]},${next[1]}) pik=r${dst.piks.red}/b${dst.piks.blue}/y${dst.piks.yellow}`);
         food.row=next[0]; food.col=next[1];
         if(food.row===state.startRow&&food.col===state.startCol){
           arrived.push(food); break;
@@ -225,7 +235,7 @@ const Piktorioengine = (() => {
         if(nr<0||nr>=state.rows||nc<0||nc>=state.cols) continue;
         if(visited.has(key(nr,nc))) continue;
         const cell=state.map[nr][nc];
-        if(!_foodCanPass(cell,foodColor)) continue;
+        if(!_foodCanPass(cell,foodColor,nr,nc)) continue;
         visited.set(key(nr,nc), [r,c]);
         if(nr===sr&&nc===sc){
           // 経路を逆トレースして最初の1歩を返す
@@ -242,18 +252,20 @@ const Piktorioengine = (() => {
     return null; // 経路なし
   }
 
-  function _foodCanPass(cell,foodColor){
+  function _foodCanPass(cell,foodColor,nr,nc){
     const t=cell.type;
-    if(t==='wall') return false;
-    // walk, cracked, 色ヒビ壁: 常に通過可
-    if(t==='walk'||t==='cracked'||t==='red_cracked'||t==='blue_cracked'||t==='yellow_cracked') return true;
-    // 色壁(red/blue/yellow): そのマスのpikが全て同色なら通過可
+    if(t==='wall'){ _dbgLog(`canPass(${nr},${nc}) BLOCK wall`); return false; }
+    if(t==='walk'||t==='cracked') return true;
+    if(t==='red_cracked'||t==='blue_cracked'||t==='yellow_cracked'){ _dbgLog(`canPass(${nr},${nc}) BLOCK cracked ${t}`); return false; }
     if(t==='red'||t==='blue'||t==='yellow'){
       const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
-      if(total===0) return false;
+      if(total===0){ _dbgLog(`canPass(${nr},${nc}) BLOCK color-wall ${t} no-pik`); return false; }
       const same=cell.piks[t];
-      return same===total;
+      const ok=same===total;
+      _dbgLog(`canPass(${nr},${nc}) ${t} piks=r${cell.piks.red}/b${cell.piks.blue}/y${cell.piks.yellow} → ${ok?'OK':'BLOCK'}`);
+      return ok;
     }
+    _dbgLog(`canPass(${nr},${nc}) BLOCK unknown ${t}`);
     return false;
   }
 
