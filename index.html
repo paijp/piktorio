@@ -135,17 +135,46 @@ window.onerror=function(msg,src,line,col,err){
 };
 window.addEventListener('DOMContentLoaded',()=>{
   bindCanvas();
-  // レイアウト確定後にinit（AndroidでclientHeight=0問題を回避）
+  const log=document.getElementById('debugLog');
+  const msg=document.getElementById('piktorioMessage');
+
+  function dbg(s){ if(log) log.value=s+'\n'+log.value; }
+
+  dbg('DOMContentLoaded fired');
+
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
+      const canvas=document.getElementById('piktorioCanvas');
+      const wrap=document.getElementById('canvasWrap');
+      const wW=wrap.clientWidth, wH=wrap.clientHeight;
+      const iW=window.innerWidth, iH=window.innerHeight;
+      dbg('wrap='+wW+'x'+wH+' inner='+iW+'x'+iH);
+
+      // canvasサイズを設定
+      const size=Math.max(280, Math.floor(Math.min(wW||iW, wH||iH)/40)*40);
+      canvas.width=size; canvas.height=size;
+      dbg('canvas='+canvas.width+'x'+canvas.height);
+
+      // ステップ1: 直接描画テスト
       try{
-        resizeCanvas();
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#1a3a10';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle='#ffffff';
+        ctx.font='bold 24px monospace';
+        ctx.textAlign='center';
+        ctx.fillText('canvas OK '+size, canvas.width/2, canvas.height/2);
+        dbg('direct draw OK');
+      }catch(e){ dbg('draw ERR: '+e.message); }
+
+      // ステップ2: エンジン初期化
+      try{
         window._piktorioReady=true;
         Piktorioengine.init(mapData);
+        dbg('engine init OK');
       }catch(e){
-        const el=document.getElementById('debugLog');
-        if(el) el.value='INIT ERROR: '+e.message+'\n'+e.stack;
-        document.getElementById('piktorioMessage').textContent='初期化エラー: '+e.message;
+        dbg('INIT ERR: '+e.message);
+        if(msg) msg.textContent='エラー: '+e.message;
       }
     });
   });
