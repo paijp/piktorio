@@ -43,8 +43,7 @@ const Piktorioengine = (() => {
     const el=document.getElementById('debugLog');
     if(!el) return;
     const ts=new Date().toLocaleTimeString('ja-JP',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    el.value=(ts+' '+msg+'
-'+el.value).slice(0,4000);
+    el.value=(ts+' '+msg+'\n'+el.value).slice(0,4000);
   }
 
   // ===== フラッシュ管理 =====
