@@ -443,17 +443,24 @@ const Piktorioengine = (() => {
     const pr=state.player.row, pc=state.player.col;
     const cellX=ox+pc*CELL, cellY=oy+pr*CELL;
     if(state.phase==='player'&&_hitCheckmark(px,py,cellX,cellY,CELL)){
-      if(state.movesLeft>0) skipMove();
-      else                  endPlayerTurn();
+      endPlayerTurn();
       return;
     }
     if(state.phase==='player'){
       if(r<0||r>=state.rows||c<0||c>=state.cols) return;
       const dr=r-pr, dc_=c-pc;
-      if(state.movesLeft>0 && Math.abs(dr)+Math.abs(dc_)===1&&_canEnter(r,c)){
-        _triggerFlash(r,c,'arrow');
-        movePlayer(dr,dc_);
-        return;
+      // 矢印は2マス先に描画。タップ先が同軸1〜2マス先なら隣1マスへ移動
+      if(state.movesLeft>0){
+        const adR=Math.abs(dr), adC=Math.abs(dc_);
+        const straight=(adR===0&&adC>=1&&adC<=2)||(adC===0&&adR>=1&&adR<=2);
+        if(straight){
+          const mdr=dr===0?0:(dr>0?1:-1), mdc=dc_===0?0:(dc_>0?1:-1);
+          if(_canEnter(state.player.row+mdr,state.player.col+mdc)){
+            _triggerFlash(state.player.row+mdr,state.player.col+mdc,'arrow');
+            movePlayer(mdr,mdc);
+            return;
+          }
+        }
       }
       if(Math.abs(dr)<=1&&Math.abs(dc_)<=1&&!(dr===0&&dc_===0)){
         const half=CELL/2;
