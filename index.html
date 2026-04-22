@@ -112,8 +112,8 @@ const mapData = {
 function resizeCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
   const wrap=document.getElementById('canvasWrap');
-  const size=Math.floor(Math.min(wrap.clientWidth,wrap.clientHeight)/40)*40;
-  if(size<=0)return;
+  const raw=Math.min(wrap.clientWidth||window.innerWidth, wrap.clientHeight||window.innerHeight);
+  const size=Math.max(280, Math.floor(raw/40)*40);
   canvas.width=size;canvas.height=size;
   if(window._piktorioReady)Piktorioengine.init(mapData);
 }
@@ -134,16 +134,21 @@ window.onerror=function(msg,src,line,col,err){
   return true;
 };
 window.addEventListener('DOMContentLoaded',()=>{
-  try{
-    resizeCanvas();bindCanvas();
-    window._piktorioReady=true;
-    Piktorioengine.init(mapData);
-  }catch(e){
-    const el=document.getElementById('debugLog');
-    if(el) el.value='INIT ERROR: '+e.message+'
-'+e.stack;
-    document.getElementById('piktorioMessage').textContent='初期化エラー: '+e.message;
-  }
+  bindCanvas();
+  // レイアウト確定後にinit（AndroidでclientHeight=0問題を回避）
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      try{
+        resizeCanvas();
+        window._piktorioReady=true;
+        Piktorioengine.init(mapData);
+      }catch(e){
+        const el=document.getElementById('debugLog');
+        if(el) el.value='INIT ERROR: '+e.message+'\n'+e.stack;
+        document.getElementById('piktorioMessage').textContent='初期化エラー: '+e.message;
+      }
+    });
+  });
 });
 let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(resizeCanvas,150);});
 </script>
