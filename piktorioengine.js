@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.13
+// piktorioengine.js — Piktorioゲームエンジン v0.13.1
 
 const Piktorioengine = (() => {
 
@@ -182,13 +182,17 @@ const Piktorioengine = (() => {
   function _runFoodTurn(){
     const arrived=[];
     for(const food of state.foods){
-      const cell=state.map[food.row][food.col];
-      const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
+      const fromCell=state.map[food.row][food.col];
+      const total=fromCell.piks.red+fromCell.piks.blue+fromCell.piks.yellow;
       if(total<food.weight) continue; // pikが足りない
       const steps=(total>=food.weight*2)?2:1;
       for(let s=0;s<steps;s++){
         const next=_foodNextCell(food.row,food.col,food.color);
         if(next===null) break;
+        // 移動元のpikを全て移動先へ運ぶ
+        const src=state.map[food.row][food.col];
+        const dst=state.map[next[0]][next[1]];
+        COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
         food.row=next[0]; food.col=next[1];
         if(food.row===state.startRow&&food.col===state.startCol){
           arrived.push(food); break;
@@ -196,7 +200,7 @@ const Piktorioengine = (() => {
       }
     }
     for(const food of arrived){
-      // スタートマスにエサ色のpikをエサ重さ分追加
+      // スタートマスにエサ色のpikをエサ重さ分追加（運んできたpikはそのままスタートマスに残る）
       state.map[state.startRow][state.startCol].piks[food.color]+=food.weight;
       state.foods=state.foods.filter(f=>f.id!==food.id);
     }
