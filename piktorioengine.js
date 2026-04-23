@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.15.2
+// piktorioengine.js — Piktorioゲームエンジン v0.15.3
 
 const Piktorioengine = (() => {
 
@@ -194,7 +194,9 @@ const Piktorioengine = (() => {
     state.phase='enemy'; _setMessage('敵ターン中…');
     setTimeout(()=>{
       _runFoodTurn(()=>{
-        _render(); setTimeout(_runEnemyTurn, 300);
+        _runTreasureTurn(()=>{
+          _render(); setTimeout(_runEnemyTurn, 300);
+        });
       });
     }, 260);
   }
@@ -268,7 +270,7 @@ const Piktorioengine = (() => {
     for(const t of state.treasures){
       const cell=state.map[t.row][t.col];
       const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
-      if(total<t.weight){ t._steps=0; continue; }
+      if(total<t.weight){ _dbgLog(`treasure#${t.id}(w${t.weight}) skip pik=${total}<${t.weight}`); t._steps=0; continue; }
       t._steps=(total>=t.weight*2)?2:1;
       const next=_treasureNextCell(t.row,t.col);
       if(next===null){ t._steps=0; continue; }
