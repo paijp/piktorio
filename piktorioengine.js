@@ -558,6 +558,31 @@ const Piktorioengine = (() => {
     }
   }
 
+  // ===== 宝物描画 =====
+  function _drawTreasure(ctx,x,y,CELL,t){
+    const cx=x+CELL/2, cy=y+CELL/2;
+    const r=CELL*0.32;
+    // 影
+    ctx.beginPath(); ctx.arc(cx+1,cy+2,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
+    // 白円
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.fill();
+    ctx.strokeStyle='rgba(200,200,255,0.8)';
+    ctx.lineWidth=Math.max(1,CELL*0.05); ctx.stroke();
+    // ★と重さ数字
+    ctx.save();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#e8d020';
+    ctx.font=`bold ${Math.max(8,Math.floor(CELL*0.28))}px monospace`;
+    ctx.fillText('★',cx,cy-CELL*0.06);
+    ctx.fillStyle='#333';
+    ctx.font=`bold ${Math.max(6,Math.floor(CELL*0.20))}px monospace`;
+    ctx.fillText(String(t.weight),cx,cy+CELL*0.14);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.restore();
+  }
+
   function _drawActionButtons(ctx,CELL,ox,oy){
     const pr=state.player.row, pc=state.player.col;
     for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
