@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.14
+// piktorioengine.js — Piktorioゲームエンジン v0.14.2
 
 const Piktorioengine = (() => {
 
@@ -365,9 +365,14 @@ const Piktorioengine = (() => {
     const pr=state.player.row, pc=state.player.col;
     const cellX=ox+pc*CELL, cellY=oy+pr*CELL;
     if(state.phase==='player'){
-      if(state.movesLeft>0)
+      if(state.movesLeft>0){
         [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dc,dr])=>_drawArrow(ctx,cellX,cellY,CELL,dc,dr));
-      _drawCheckmark(ctx,cellX,cellY,CELL);
+        _drawCheckmark(ctx,cellX,cellY,CELL);
+      } else {
+        // 移動残り0: 中央チェックマーク＋4方向チェックマーク（全部ターン終了）
+        _drawCheckmark(ctx,cellX,cellY,CELL);
+        [[0,-2],[0,2],[-2,0],[2,0]].forEach(([dc,dr])=>_drawEndTurnButton(ctx,cellX,cellY,CELL,dc,dr));
+      }
     }
     _drawMinimap(ctx,canvas);
     _updateUI();
@@ -535,6 +540,21 @@ const Piktorioengine = (() => {
     ctx.restore();
   }
 
+  // ターン終了ボタン（movesLeft===0のとき4方向に表示）
+  function _drawEndTurnButton(ctx,cellX,cellY,CELL,dcol,drow){
+    const cx=cellX+CELL/2+dcol*CELL, cy=cellY+CELL/2+drow*CELL;
+    const s=CELL*0.22;
+    // 緑円
+    ctx.beginPath(); ctx.arc(cx,cy,s*1.1,0,Math.PI*2);
+    ctx.fillStyle='rgba(40,160,40,0.72)'; ctx.fill();
+    // チェック記号
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineWidth=s*0.4;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.45,cy); ctx.lineTo(cx-s*0.1,cy+s*0.45); ctx.lineTo(cx+s*0.48,cy-s*0.42);
+    ctx.stroke(); ctx.restore();
+  }
+
   function _drawCheckmark(ctx,cellX,cellY,CELL){
     const cx=cellX+CELL/2, cy=cellY+CELL/2, s=CELL*0.22;
     ctx.beginPath(); ctx.arc(cx,cy,s*1.1,0,Math.PI*2);
@@ -620,17 +640,21 @@ const Piktorioengine = (() => {
       if(r<0||r>=state.rows||c<0||c>=state.cols) return;
       const dr=r-pr, dc_=c-pc;
       // 矢印は2マス先に描画。タップ先が同軸1〜2マス先なら隣1マスへ移動
-      if(state.movesLeft>0){
-        const adR=Math.abs(dr), adC=Math.abs(dc_);
-        // 矢印は2マス先に表示。2マス先のタップのみ移動（1マス先はアクション扱い）
-        const isArrow=(adR===0&&adC===2)||(adC===0&&adR===2);
-        if(isArrow){
+      const adR=Math.abs(dr), adC=Math.abs(dc_);
+      const isOuterButton=(adR===0&&adC===2)||(adC===0&&adR===2);
+      if(isOuterButton){
+        if(state.movesLeft>0){
+          // 矢印ボタン: 移動
           const mdr=dr===0?0:(dr>0?1:-1), mdc=dc_===0?0:(dc_>0?1:-1);
           if(_canEnter(state.player.row+mdr,state.player.col+mdc)){
             _triggerFlash(state.player.row+mdr,state.player.col+mdc,'arrow');
             movePlayer(mdr,mdc);
             return;
           }
+        } else {
+          // ターン終了ボタン
+          endPlayerTurn();
+          return;
         }
       }
       if(Math.abs(dr)<=1&&Math.abs(dc_)<=1&&!(dr===0&&dc_===0)){
