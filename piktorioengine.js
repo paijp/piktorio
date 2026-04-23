@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.15.3
+// piktorioengine.js — Piktorioゲームエンジン v0.15.4
 
 const Piktorioengine = (() => {
 
@@ -398,6 +398,8 @@ const Piktorioengine = (() => {
         if(nr===state.player.row&&nc===state.player.col) continue;
         // 他エサのいるマスは通過不可
         if(state.foods.some(f=>f!==undefined&&f.row===nr&&f.col===nc)) continue;
+        // 宝物のいるマスは通過不可
+        if(state.treasures&&state.treasures.some(t=>t.row===nr&&t.col===nc)) continue;
         visited.set(key(nr,nc), [r,c]);
         if(nr===sr&&nc===sc){
           // 経路を逆トレースして最初の1歩を返す
