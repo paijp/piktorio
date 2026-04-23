@@ -1,9 +1,10 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.14.2
+// piktorioengine.js — Piktorioゲームエンジン v0.15
 
 const Piktorioengine = (() => {
 
   const COLORS      = ['red','blue','yellow'];
-  const FOOD_WEIGHTS = [1, 5, 10];
+  const FOOD_WEIGHTS  = [1, 5, 10];
+  const TREASURE_WEIGHTS = [10, 20, 40];
   const FOOD_COLOR_FILL = { red:'#cc3333', blue:'#2277cc', yellow:'#aaaa10' };
   const FOOD_COLOR_STROKE = { red:'#ff8888', blue:'#88ccff', yellow:'#ffee44' };
   const MOVE_LIMIT  = 3;
@@ -75,7 +76,12 @@ const Piktorioengine = (() => {
       id:i, color:f.color, weight:f.weight,
       row:f.row, col:f.col,
     }));
-    state={rows,cols,map:tiles,fogMap,foods,
+    const treasures=(mapData.treasures||[]).map((t,i)=>({
+      id:i, weight:t.weight,
+      row:t.row, col:t.col,
+    }));
+    const treasureTotal=treasures.length;
+    state={rows,cols,map:tiles,fogMap,foods,treasures,treasureTotal,treasureArrived:0,
       startRow:mapData.playerStart[0], startCol:mapData.playerStart[1],
       player:{row:mapData.playerStart[0], col:mapData.playerStart[1], piks:{red:0,blue:0,yellow:0}},
       phase:'player', movesLeft:MOVE_LIMIT, turn:1, message:'移動してください'};
@@ -108,8 +114,9 @@ const Piktorioengine = (() => {
   function _canEnter(r,c){
     if(r<0||r>=state.rows||c<0||c>=state.cols) return false;
     if(state.map[r][c].type!=='walk') return false;
-    // エサのいるマスには進入不可
+    // エサ・宝物のいるマスには進入不可
     if(state&&state.foods&&state.foods.some(f=>f.row===r&&f.col===c)) return false;
+    if(state&&state.treasures&&state.treasures.some(t=>t.row===r&&t.col===c)) return false;
     return true;
   }
 
@@ -256,6 +263,106 @@ const Piktorioengine = (() => {
     }
   }
 
+  // ===== 宝物ターン =====
+  function _treasureStep1(arrived){
+    for(const t of state.treasures){
+      const cell=state.map[t.row][t.col];
+      const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
+      if(total<t.weight){ t._steps=0; continue; }
+      t._steps=(total>=t.weight*2)?2:1;
+      const next=_treasureNextCell(t.row,t.col);
+      if(next===null){ t._steps=0; continue; }
+      const src=state.map[t.row][t.col];
+      const dst=state.map[next[0]][next[1]];
+      COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
+      t.row=next[0]; t.col=next[1];
+      if(t.row===state.startRow&&t.col===state.startCol) arrived.push(t);
+    }
+  }
+
+  function _treasureStep2(arrived){
+    for(const t of state.treasures){
+      if(!t._steps||t._steps<2) continue;
+      if(arrived.some(a=>a.id===t.id)) continue;
+      const next=_treasureNextCell(t.row,t.col);
+      if(next===null) continue;
+      const src=state.map[t.row][t.col];
+      const dst=state.map[next[0]][next[1]];
+      COLORS.forEach(col=>{ dst.piks[col]+=src.piks[col]; src.piks[col]=0; });
+      t.row=next[0]; t.col=next[1];
+      if(t.row===state.startRow&&t.col===state.startCol) arrived.push(t);
+    }
+  }
+
+  function _runTreasureTurn(onDone){
+    if(!state.treasures||state.treasures.length===0){ onDone(); return; }
+    const arrived=[];
+    _treasureStep1(arrived);
+    // 到達した宝物を消滅
+    for(const t of arrived){
+      state.treasureArrived++;
+      state.treasures=state.treasures.filter(x=>x.id!==t.id);
+    }
+    _render();
+    const needStep2=state.treasures.some(t=>t._steps===2);
+    if(needStep2){
+      setTimeout(()=>{
+        const arrived2=[];
+        _treasureStep2(arrived2);
+        for(const t of arrived2){
+          state.treasureArrived++;
+          state.treasures=state.treasures.filter(x=>x.id!==t.id);
+        }
+        _render();
+        // 全宝物到達でクリア
+        if(state.treasureTotal>0&&state.treasures.length===0){
+          _setMessage('★ ステージクリア！全宝物をスタートに運びました ★');
+        }
+        onDone();
+      },150);
+    } else {
+      if(state.treasureTotal>0&&state.treasures.length===0){
+        _setMessage('★ ステージクリア！全宝物をスタートに運びました ★');
+      }
+      onDone();
+    }
+  }
+
+  // 宝物の次の移動先（walkのみ通過可）
+  function _treasureNextCell(fr,fc){
+    const sr=state.startRow, sc=state.startCol;
+    if(fr===sr&&fc===sc) return null;
+    const key=(r,c)=>r*200+c;
+    const visited=new Map();
+    visited.set(key(fr,fc),null);
+    const queue=[[fr,fc]];
+    while(queue.length){
+      const[r,c]=queue.shift();
+      for(const[dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=state.rows||nc<0||nc>=state.cols) continue;
+        if(visited.has(key(nr,nc))) continue;
+        const cell=state.map[nr][nc];
+        if(cell.type!=='walk') continue;
+        // プレイヤー・他エサ・他宝物のいるマスは通過不可
+        if(nr===state.player.row&&nc===state.player.col) continue;
+        if(state.foods.some(f=>f.row===nr&&f.col===nc)) continue;
+        if(state.treasures.some(t=>t.row===nr&&t.col===nc)) continue;
+        visited.set(key(nr,nc),[r,c]);
+        if(nr===sr&&nc===sc){
+          let cur=[nr,nc];
+          while(true){
+            const prev=visited.get(key(cur[0],cur[1]));
+            if(prev[0]===fr&&prev[1]===fc) return cur;
+            cur=prev;
+          }
+        }
+        queue.push([nr,nc]);
+      }
+    }
+    return null;
+  }
+
   // エサの次の移動先をBFS最短経路で1マス返す
   function _foodNextCell(fr,fc,foodColor){
     // BFSでスタートマスへの最短経路を探す
@@ -399,6 +506,10 @@ const Piktorioengine = (() => {
     // エサ描画
     for(const food of state.foods){
       if(food.row===r&&food.col===c) _drawFood(ctx,x,y,CELL,food);
+    }
+    // 宝物描画
+    for(const t of (state.treasures||[])){
+      if(t.row===r&&t.col===c) _drawTreasure(ctx,x,y,CELL,t);
     }
   }
 
@@ -591,6 +702,17 @@ const Piktorioengine = (() => {
     const px=mx+state.player.col*M+M*0.5, py=my+state.player.row*M+M*0.5;
     ctx.beginPath(); ctx.arc(px,py,M*0.65,0,Math.PI*2); ctx.fillStyle='#f0efe0'; ctx.fill();
     ctx.strokeStyle='#333'; ctx.lineWidth=0.8; ctx.stroke();
+    // 宝物カウンタをミニマップの上に表示
+    if(state.treasureTotal>0){
+      const total=state.treasureTotal, arrived=state.treasureArrived;
+      const label=`★ ${arrived}/${total}`;
+      const fs=Math.max(9,M*2.5);
+      ctx.font=`bold ${fs}px monospace`;
+      ctx.textAlign='right';
+      ctx.fillStyle=arrived===total?'#ffe040':'rgba(255,255,255,0.85)';
+      ctx.fillText(label, mx+mW, my-3);
+      ctx.textAlign='left';
+    }
   }
 
   function _setMessage(msg){ state.message=msg; const el=document.getElementById('piktorioMessage'); if(el) el.textContent=msg; }
