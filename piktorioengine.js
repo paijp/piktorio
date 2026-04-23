@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.15
+// piktorioengine.js — Piktorioゲームエンジン v0.15.2
 
 const Piktorioengine = (() => {
 
@@ -343,7 +343,16 @@ const Piktorioengine = (() => {
         if(nr<0||nr>=state.rows||nc<0||nc>=state.cols) continue;
         if(visited.has(key(nr,nc))) continue;
         const cell=state.map[nr][nc];
-        if(cell.type!=='walk') continue;
+        // walkは常に通過可。色壁はそのマスのpikが全て同色なら通過可
+        if(cell.type!=='walk'){
+          const ct=cell.type;
+          if(ct==='red'||ct==='blue'||ct==='yellow'){
+            const total=cell.piks.red+cell.piks.blue+cell.piks.yellow;
+            if(total===0||cell.piks[ct]!==total) continue;
+          } else {
+            continue;
+          }
+        }
         // プレイヤー・他エサ・他宝物のいるマスは通過不可
         if(nr===state.player.row&&nc===state.player.col) continue;
         if(state.foods.some(f=>f.row===nr&&f.col===nc)) continue;
@@ -559,26 +568,23 @@ const Piktorioengine = (() => {
   }
 
   // ===== 宝物描画 =====
-  function _drawTreasure(ctx,x,y,CELL,t){
+    function _drawTreasure(ctx,x,y,CELL,t){
     const cx=x+CELL/2, cy=y+CELL/2;
-    const r=CELL*0.32;
-    // 影
-    ctx.beginPath(); ctx.arc(cx+1,cy+2,r,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
-    // 白円
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.fill();
-    ctx.strokeStyle='rgba(200,200,255,0.8)';
-    ctx.lineWidth=Math.max(1,CELL*0.05); ctx.stroke();
-    // ★と重さ数字
+    const fs=Math.max(10,Math.floor(CELL*0.72));
     ctx.save();
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillStyle='#e8d020';
-    ctx.font=`bold ${Math.max(8,Math.floor(CELL*0.28))}px monospace`;
-    ctx.fillText('★',cx,cy-CELL*0.06);
-    ctx.fillStyle='#333';
-    ctx.font=`bold ${Math.max(6,Math.floor(CELL*0.20))}px monospace`;
-    ctx.fillText(String(t.weight),cx,cy+CELL*0.14);
+    // 白い★（影付き）
+    ctx.shadowColor='rgba(0,0,0,0.6)';
+    ctx.shadowBlur=3;
+    ctx.fillStyle='#ffffff';
+    ctx.font=`bold ${fs}px monospace`;
+    ctx.fillText('★',cx,cy);
+    ctx.shadowBlur=0;
+    // 重さ数字（中央に黒文字）
+    const ns=Math.max(6,Math.floor(CELL*0.22));
+    ctx.fillStyle='#000000';
+    ctx.font=`bold ${ns}px monospace`;
+    ctx.fillText(String(t.weight),cx,cy+CELL*0.04);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.restore();
   }
