@@ -1,4 +1,4 @@
-// piktorioeditor.js — Piktorio マップエディタ v1.0
+// piktorioeditor.js — Piktorio マップエディタ v1.1
 
 const PiktorioEditor = (() => {
 
@@ -415,11 +415,12 @@ const PiktorioEditor = (() => {
   }
 
   // GitHub pushボタン
-  async function pushToGitHub(owner, repo, pat) {
+  async function pushToGitHub(owner, repo, pat, msg) {
     const ta = document.getElementById('editorOutput');
     if (!ta || !ta.value) { alert('HTMLが空です'); return; }
     const content = ta.value;
     const encoded = btoa(unescape(encodeURIComponent(content)));
+    const commitMsg = msg || 'Update map via PiktorioEditor';
     // 現在のSHAを取得
     const res1 = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/index.html`, {
       headers: { Authorization: `token ${pat}`, 'User-Agent': 'PiktorioEditor' }
@@ -435,11 +436,7 @@ const PiktorioEditor = (() => {
         'Content-Type': 'application/json',
         'User-Agent': 'PiktorioEditor',
       },
-      body: JSON.stringify({
-        message: 'Update map via PiktorioEditor',
-        content: encoded,
-        sha: sha,
-      }),
+      body: JSON.stringify({ message: commitMsg, content: encoded, sha }),
     });
     if (res2.ok) {
       alert('GitHubへの更新が完了しました');
