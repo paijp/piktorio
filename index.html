@@ -19,10 +19,33 @@
   #legend{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:clamp(0.5rem,1.5vw,0.62rem);color:#555;justify-content:center;flex-shrink:0;padding:0 4px 2px}
   .leg{display:flex;align-items:center;gap:3px}.leg-box{width:8px;height:8px;flex-shrink:0}
   #debugLog{width:100%;max-width:560px;height:80px;background:#111;color:#8f8;font-size:0.6rem;font-family:monospace;border:1px solid #333;resize:none;flex-shrink:0;padding:2px 4px;box-sizing:border-box;}
+  /* ===== エディタUI ===== */
+  #modeBar{display:flex;gap:6px;padding:3px 6px;background:#1a1a1a;flex-shrink:0;}
+  .mode-btn{padding:4px 12px;border:1px solid #555;background:#222;color:#ccc;border-radius:4px;font-size:0.75rem;cursor:pointer;touch-action:manipulation;}
+  .mode-btn.active{background:#3a6a3a;color:#fff;border-color:#6aaa6a;}
+  #editorPanel{display:none;flex-direction:column;flex-shrink:0;background:#111;border-top:1px solid #333;}
+  #edToolBar{display:flex;gap:4px;padding:4px 6px;flex-wrap:wrap;}
+  .ed-tool-btn{padding:3px 10px;border:1px solid #444;background:#222;color:#bbb;border-radius:3px;font-size:0.72rem;cursor:pointer;touch-action:manipulation;}
+  .ed-tool-btn.active{background:#335;color:#aaf;border-color:#66f;}
+  #edPalette{display:flex;flex-wrap:wrap;gap:3px;padding:3px 6px;}
+  .ed-palette-btn{width:36px;height:36px;border:2px solid #444;border-radius:3px;cursor:pointer;font-size:0.55rem;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.1;touch-action:manipulation;flex-shrink:0;}
+  .ed-palette-btn.active{border-color:#ff0;outline:2px solid #ff0;}
+  #edFoodOpts,#edTreasureOpts{display:none;padding:2px 6px;gap:4px;flex-wrap:wrap;align-items:center;}
+  #edFoodOpts.show,#edTreasureOpts.show{display:flex;}
+  #edFoodOpts label,#edTreasureOpts label{color:#aaa;font-size:0.7rem;}
+  #edFoodOpts select,#edTreasureOpts select{background:#222;color:#eee;border:1px solid #555;padding:2px;font-size:0.7rem;}
+  #edGitHub{padding:4px 6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;border-top:1px solid #222;}
+  #edGitHub input{background:#1a1a1a;color:#ccc;border:1px solid #444;padding:3px 6px;font-size:0.7rem;border-radius:3px;flex:1;min-width:80px;}
+  #edGitHub button{padding:3px 10px;background:#335;color:#aaf;border:1px solid #559;border-radius:3px;font-size:0.7rem;cursor:pointer;touch-action:manipulation;}
+  #editorOutput{width:100%;height:100px;background:#0a0a0a;color:#8f8;font-size:0.55rem;font-family:monospace;border:none;border-top:1px solid #222;resize:none;flex-shrink:0;padding:3px 6px;box-sizing:border-box;}
 </style>
 </head>
 <body>
 <div id="app">
+  <div id="modeBar">
+    <button class="mode-btn active" id="modePlay" onclick="switchMode('play')">▶ Play</button>
+    <button class="mode-btn" id="modeEdit" onclick="switchMode('edit')">✏ Edit</button>
+  </div>
   <div id="topbar">
     <div id="title">Piktorio</div>
     <div id="statusbar">
@@ -41,9 +64,64 @@
     <div class="leg"><div class="leg-box" style="background:#2277cc"></div>青/青ヒビ(HP40)</div>
     <div class="leg"><div class="leg-box" style="background:#aaaa10"></div>黄/黄ヒビ(HP40)</div>
   </div>
+  <div id="editorPanel">
+    <div id="edToolBar">
+      <button class="ed-tool-btn active" id="edTool_scroll" onclick="PiktorioEditor.setTool('scroll')">🖐 スクロール</button>
+      <button class="ed-tool-btn" id="edTool_draw" onclick="PiktorioEditor.setTool('draw')">✏ 描画</button>
+      <button class="ed-tool-btn" id="edTool_erase" onclick="PiktorioEditor.setTool('erase')">🗑 削除</button>
+    </div>
+    <div id="edPalette">
+      <button class="ed-palette-btn active" data-type="wall" style="background:#5a3010" onclick="selPalette('wall')">壁</button>
+      <button class="ed-palette-btn" data-type="walk" style="background:#2d5a1b" onclick="selPalette('walk')">通路</button>
+      <button class="ed-palette-btn" data-type="cracked" style="background:#4a2808" onclick="selPalette('cracked')">ヒビ壁</button>
+      <button class="ed-palette-btn" data-type="red" style="background:#cc3333" onclick="selPalette('red')">赤壁</button>
+      <button class="ed-palette-btn" data-type="blue" style="background:#2277cc" onclick="selPalette('blue')">青壁</button>
+      <button class="ed-palette-btn" data-type="yellow" style="background:#aaaa10" onclick="selPalette('yellow')">黄壁</button>
+      <button class="ed-palette-btn" data-type="red_cracked" style="background:#cc3333;border-style:dashed" onclick="selPalette('red_cracked')">赤ヒビ</button>
+      <button class="ed-palette-btn" data-type="blue_cracked" style="background:#2277cc;border-style:dashed" onclick="selPalette('blue_cracked')">青ヒビ</button>
+      <button class="ed-palette-btn" data-type="yellow_cracked" style="background:#aaaa10;border-style:dashed" onclick="selPalette('yellow_cracked')">黄ヒビ</button>
+      <button class="ed-palette-btn" data-type="food_" style="background:#cc3333" onclick="selPalette('food_')">エサ</button>
+      <button class="ed-palette-btn" data-type="treasure_" style="background:#333;color:#ff0" onclick="selPalette('treasure_')">★宝物</button>
+      <button class="ed-palette-btn" data-type="start" style="background:#fff;color:#000" onclick="selPalette('start')">S</button>
+    </div>
+    <div id="edFoodOpts">
+      <label>色:
+        <select onchange="PiktorioEditor.setFoodColor(this.value)">
+          <option value="red">赤</option>
+          <option value="blue">青</option>
+          <option value="yellow">黄</option>
+        </select>
+      </label>
+      <label>重さ:
+        <select onchange="PiktorioEditor.setFoodWeight(this.value)">
+          <option value="1">1</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+    </div>
+    <div id="edTreasureOpts">
+      <label>重さ:
+        <select onchange="PiktorioEditor.setTreasureWeight(this.value)">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="40">40</option>
+        </select>
+      </label>
+    </div>
+    <div id="edGitHub">
+      <input id="edOwner" placeholder="owner" style="max-width:80px">
+      <input id="edRepo" placeholder="repo" style="max-width:80px">
+      <input id="edPat" type="password" placeholder="GitHub PAT">
+      <button onclick="edPush()">Push</button>
+      <button onclick="edTestPlay()">▶ テスト</button>
+    </div>
+    <textarea id="editorOutput" readonly placeholder="編集するとindex.htmlが表示されます…"></textarea>
+  </div>
   <textarea id="debugLog" readonly placeholder="デバッグログ…"></textarea>
 </div>
 <script src="piktorioengine.js?v=0.15.4"></script>
+<script src="piktorioeditor.js?v=1.0"></script>
 <script>
 const W  = { type: 'walk' };
 const WL = (r,b,y) => ({ type:'walk', piks:{red:r||0,blue:b||0,yellow:y||0} });
@@ -113,6 +191,70 @@ const mapData = {
     [ BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK, BK ],
   ],
 };
+
+// ===== モード管理 =====
+let _currentMode = 'play';
+function switchMode(mode) {
+  _currentMode = mode;
+  document.getElementById('modePlay').classList.toggle('active', mode==='play');
+  document.getElementById('modeEdit').classList.toggle('active', mode==='edit');
+  document.getElementById('topbar').style.display    = mode==='play' ? '' : 'none';
+  document.getElementById('legend').style.display    = mode==='play' ? '' : 'none';
+  document.getElementById('piktorioMessage').style.display = mode==='play' ? '' : 'none';
+  document.getElementById('debugLog').style.display  = mode==='play' ? '' : 'none';
+  document.getElementById('editorPanel').style.display = mode==='edit' ? 'flex' : 'none';
+  if (mode === 'edit') {
+    // HTMLのオリジナルを保持
+    if (!window._originalHTML) window._originalHTML = document.getElementById('editorOutput')?.value || new XMLSerializer().serializeToString(document);
+    PiktorioEditor.activate(mapData);
+  } else {
+    PiktorioEditor.deactivate();
+    bindCanvas();
+    if (window._piktorioReady) Piktorioengine.init(mapData);
+  }
+}
+
+// エディタパレット選択
+function selPalette(type) {
+  PiktorioEditor.setTool('draw');
+  document.getElementById('edTool_draw').classList.add('active');
+  document.getElementById('edTool_scroll').classList.remove('active');
+  document.getElementById('edTool_erase').classList.remove('active');
+  PiktorioEditor.setDrawType(type);
+  document.getElementById('edFoodOpts').classList.toggle('show', type==='food_');
+  document.getElementById('edTreasureOpts').classList.toggle('show', type==='treasure_');
+}
+
+// テストプレイ
+function edTestPlay() {
+  const testData = PiktorioEditor.getMapData();
+  // mapDataを一時的に上書きしてplayモードに切替
+  Object.assign(mapData, testData);
+  switchMode('play');
+}
+
+// GitHub push
+async function edPush() {
+  const owner = document.getElementById('edOwner').value.trim();
+  const repo  = document.getElementById('edRepo').value.trim();
+  let pat     = document.getElementById('edPat').value.trim();
+  if (!pat) pat = localStorage.getItem('piktorioEdPat') || '';
+  if (!owner || !repo || !pat) { alert('owner / repo / PATを入力してください'); return; }
+  localStorage.setItem('piktorioEdPat', pat);
+  localStorage.setItem('piktorioEdOwner', owner);
+  localStorage.setItem('piktorioEdRepo', repo);
+  await PiktorioEditor.pushToGitHub(owner, repo, pat);
+}
+
+// 保存済みPAT/owner/repoを復元
+window.addEventListener('DOMContentLoaded', () => {
+  const o = localStorage.getItem('piktorioEdOwner');
+  const r = localStorage.getItem('piktorioEdRepo');
+  const p = localStorage.getItem('piktorioEdPat');
+  if (o) document.getElementById('edOwner').value = o;
+  if (r) document.getElementById('edRepo').value  = r;
+  if (p) document.getElementById('edPat').value   = p;
+});
 
 function resizeCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
