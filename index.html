@@ -110,18 +110,29 @@
       </label>
     </div>
     <div id="edGitHub">
-      <input id="edOwner" placeholder="owner" style="max-width:80px">
-      <input id="edRepo" placeholder="repo" style="max-width:80px">
-      <input id="edPat" type="password" placeholder="GitHub PAT">
-      <button onclick="edPush()">Push</button>
       <button onclick="edTestPlay()">▶ テスト</button>
+      <button onclick="edShowPushDialog()">⬆ Push</button>
+    </div>
+    <!-- Push ダイアログ -->
+    <div id="edPushDialog" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:999;align-items:center;justify-content:center;">
+      <div style="background:#1a1a1a;border:1px solid #555;border-radius:8px;padding:16px;width:min(90vw,340px);display:flex;flex-direction:column;gap:8px;">
+        <div style="color:#ccc;font-size:0.85rem;font-weight:bold;">GitHub へ Push</div>
+        <label style="color:#aaa;font-size:0.75rem;">Owner<br><input id="dlgOwner" style="width:100%;background:#111;color:#eee;border:1px solid #444;padding:5px;border-radius:4px;box-sizing:border-box;" placeholder="例: paijp"></label>
+        <label style="color:#aaa;font-size:0.75rem;">Repository<br><input id="dlgRepo" style="width:100%;background:#111;color:#eee;border:1px solid #444;padding:5px;border-radius:4px;box-sizing:border-box;" placeholder="例: piktorio"></label>
+        <label style="color:#aaa;font-size:0.75rem;">Personal Access Token<br><input id="dlgPat" type="password" style="width:100%;background:#111;color:#eee;border:1px solid #444;padding:5px;border-radius:4px;box-sizing:border-box;" placeholder="ghp_..."></label>
+        <label style="color:#aaa;font-size:0.75rem;">Commit メッセージ<br><input id="dlgMsg" style="width:100%;background:#111;color:#eee;border:1px solid #444;padding:5px;border-radius:4px;box-sizing:border-box;" value="Update map via PiktorioEditor"></label>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+          <button onclick="document.getElementById('edPushDialog').style.display='none'" style="padding:6px 16px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;">キャンセル</button>
+          <button onclick="edPushConfirm()" style="padding:6px 16px;background:#335;color:#aaf;border:1px solid #559;border-radius:4px;cursor:pointer;">Push</button>
+        </div>
+      </div>
     </div>
     <textarea id="editorOutput" readonly placeholder="編集するとindex.htmlが表示されます…"></textarea>
   </div>
   <textarea id="debugLog" readonly placeholder="デバッグログ…"></textarea>
 </div>
-<script src="piktorioengine.js?v=0.15.4"></script>
-<script src="piktorioeditor.js?v=1.0"></script>
+<script src="piktorioengine.js?v=0.16"></script>
+<script src="piktorioeditor.js?v=1.1"></script>
 <script>
 const W  = { type: 'walk' };
 const WL = (r,b,y) => ({ type:'walk', piks:{red:r||0,blue:b||0,yellow:y||0} });
@@ -204,8 +215,8 @@ function switchMode(mode) {
   document.getElementById('debugLog').style.display  = mode==='play' ? '' : 'none';
   document.getElementById('editorPanel').style.display = mode==='edit' ? 'flex' : 'none';
   if (mode === 'edit') {
-    // HTMLのオリジナルを保持
     if (!window._originalHTML) window._originalHTML = document.getElementById('editorOutput')?.value || new XMLSerializer().serializeToString(document);
+    unbindCanvas(); // プレイヤー操作を無効化
     PiktorioEditor.activate(mapData);
   } else {
     PiktorioEditor.deactivate();
@@ -233,28 +244,44 @@ function edTestPlay() {
   switchMode('play');
 }
 
-// GitHub push
-async function edPush() {
-  const owner = document.getElementById('edOwner').value.trim();
-  const repo  = document.getElementById('edRepo').value.trim();
-  let pat     = document.getElementById('edPat').value.trim();
-  if (!pat) pat = localStorage.getItem('piktorioEdPat') || '';
-  if (!owner || !repo || !pat) { alert('owner / repo / PATを入力してください'); return; }
-  localStorage.setItem('piktorioEdPat', pat);
-  localStorage.setItem('piktorioEdOwner', owner);
-  localStorage.setItem('piktorioEdRepo', repo);
-  await PiktorioEditor.pushToGitHub(owner, repo, pat);
+// URLからowner/repoを推測（GitHub Pages: https://owner.github.io/repo/）
+function _guessFromURL() {
+  try {
+    const h = location.hostname; // e.g. paijp.github.io
+    const p = location.pathname; // e.g. /piktorio/
+    const owner = h.replace('.github.io','');
+    const repo  = p.split('/').filter(Boolean)[0] || '';
+    return { owner, repo };
+  } catch(e) { return { owner:'', repo:'' }; }
 }
 
-// 保存済みPAT/owner/repoを復元
-window.addEventListener('DOMContentLoaded', () => {
-  const o = localStorage.getItem('piktorioEdOwner');
-  const r = localStorage.getItem('piktorioEdRepo');
-  const p = localStorage.getItem('piktorioEdPat');
-  if (o) document.getElementById('edOwner').value = o;
-  if (r) document.getElementById('edRepo').value  = r;
-  if (p) document.getElementById('edPat').value   = p;
-});
+// Pushダイアログを開く
+function edShowPushDialog() {
+  const dlg = document.getElementById('edPushDialog');
+  // 初期値: localStorage → URL推測
+  const saved_o = localStorage.getItem('piktorioEdOwner');
+  const saved_r = localStorage.getItem('piktorioEdRepo');
+  const saved_p = localStorage.getItem('piktorioEdPat');
+  const guess   = _guessFromURL();
+  document.getElementById('dlgOwner').value = saved_o || guess.owner;
+  document.getElementById('dlgRepo').value  = saved_r || guess.repo;
+  document.getElementById('dlgPat').value   = saved_p || '';
+  dlg.style.display = 'flex';
+}
+
+// Push実行
+async function edPushConfirm() {
+  const owner = document.getElementById('dlgOwner').value.trim();
+  const repo  = document.getElementById('dlgRepo').value.trim();
+  const pat   = document.getElementById('dlgPat').value.trim();
+  const msg   = document.getElementById('dlgMsg').value.trim() || 'Update map via PiktorioEditor';
+  if (!owner || !repo || !pat) { alert('owner / repo / PATを入力してください'); return; }
+  localStorage.setItem('piktorioEdOwner', owner);
+  localStorage.setItem('piktorioEdRepo',  repo);
+  localStorage.setItem('piktorioEdPat',   pat);
+  document.getElementById('edPushDialog').style.display = 'none';
+  await PiktorioEditor.pushToGitHub(owner, repo, pat, msg);
+}
 
 function resizeCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
@@ -266,12 +293,21 @@ function resizeCanvas(){
 }
 function bindCanvas(){
   const canvas=document.getElementById('piktorioCanvas');
-  canvas.addEventListener('touchstart',e=>{e.preventDefault();},{passive:false});
-  canvas.addEventListener('touchend',e=>{
-    e.preventDefault();
-    Piktorioengine.handleCanvasClick(e.changedTouches[0]);
-  },{passive:false});
-  canvas.addEventListener('click',e=>Piktorioengine.handleCanvasClick(e));
+  if(window._playTouchStart) canvas.removeEventListener('touchstart', window._playTouchStart);
+  if(window._playTouchEnd)   canvas.removeEventListener('touchend',   window._playTouchEnd);
+  if(window._playClick)      canvas.removeEventListener('click',      window._playClick);
+  window._playTouchStart = e=>{ e.preventDefault(); };
+  window._playTouchEnd   = e=>{ e.preventDefault(); Piktorioengine.handleCanvasClick(e.changedTouches[0]); };
+  window._playClick      = e=>Piktorioengine.handleCanvasClick(e);
+  canvas.addEventListener('touchstart', window._playTouchStart, {passive:false});
+  canvas.addEventListener('touchend',   window._playTouchEnd,   {passive:false});
+  canvas.addEventListener('click',      window._playClick);
+}
+function unbindCanvas(){
+  const canvas=document.getElementById('piktorioCanvas');
+  if(window._playTouchStart) canvas.removeEventListener('touchstart', window._playTouchStart);
+  if(window._playTouchEnd)   canvas.removeEventListener('touchend',   window._playTouchEnd);
+  if(window._playClick)      canvas.removeEventListener('click',      window._playClick);
 }
 window.onerror=function(msg,src,line,col,err){
   const el=document.getElementById('debugLog');
