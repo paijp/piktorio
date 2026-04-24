@@ -1,4 +1,4 @@
-// piktorioengine.js — Piktorioゲームエンジン v0.15.4
+// piktorioengine.js — Piktorioゲームエンジン v0.16
 
 const Piktorioengine = (() => {
 
@@ -67,7 +67,7 @@ const Piktorioengine = (() => {
     const rows=mapData.tiles.length, cols=mapData.tiles[0].length;
     const tiles=mapData.tiles.map(row=>row.map(cell=>({
       type:cell.type,
-      piks:{red:cell.piks?.red||0, blue:cell.piks?.blue||0, yellow:cell.piks?.yellow||0},
+      piks:{red:0, blue:0, yellow:0},  // ゲーム開始時はマップ上にpikなし
       hp:IS_CRACKED(cell.type)?(cell.hp??DEFAULT_HP(cell.type)):null,
     })));
     const fogMap=Array.from({length:rows},()=>new Array(cols).fill(false));
@@ -83,7 +83,7 @@ const Piktorioengine = (() => {
     const treasureTotal=treasures.length;
     state={rows,cols,map:tiles,fogMap,foods,treasures,treasureTotal,treasureArrived:0,
       startRow:mapData.playerStart[0], startCol:mapData.playerStart[1],
-      player:{row:mapData.playerStart[0], col:mapData.playerStart[1], piks:{red:0,blue:0,yellow:0}},
+      player:{row:mapData.playerStart[0], col:mapData.playerStart[1], piks:{red:1,blue:0,yellow:0}},
       phase:'player', movesLeft:MOVE_LIMIT, turn:1, message:'移動してください'};
     _revealFogFromView();
     _collectPiks();
